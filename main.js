@@ -12,7 +12,6 @@ if (typeof globalThis.FormData === 'undefined') {
 console.log('[BOOT] Starting...');
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const { execFile } = require('child_process');
 
 const PLUGIN_ID = 'com.daviddayan.resolve.youtubemusic';
@@ -44,6 +43,7 @@ const AudioDownloader = require('./lib/audio-downloader');
 const ResolveBridge = require('./lib/resolve-bridge');
 const PlaylistStore = require('./lib/playlist-store');
 const SettingsStore = require('./lib/settings-store');
+const { resolveYtdlpPath } = require('./lib/ytdlp-resolver');
 
 console.log('[BOOT] Modules loaded');
 const ytmusic = new YTMusicSearch();
@@ -55,24 +55,38 @@ console.log('[BOOT] Instances created');
 
 // --- Audio preview: get direct URL via yt-dlp ---
 let audioUrlCache = new Map(); // videoId -> { url, expires }
-const PREFETCH_CONCURRENCY = 3; // parallel yt-dlp processes
+const pendingAudioUrlRequests = new Map();
+const PREFETCH_CONCURRENCY = 2; // keep background work light so explicit play/download stays responsive
+const PREFETCH_LIMIT = 6;
+let prefetchQueue = [];
 let activePrefetches = 0;
 
-function getYtdlpPath() {
-    const bundled = path.join(__dirname, 'bin', 'yt-dlp');
-    if (fs.existsSync(bundled)) return bundled;
-    return 'yt-dlp';
-}
-
 function getAudioUrl(videoId) {
-    return new Promise((resolve, reject) => {
+    const cached = audioUrlCache.get(videoId);
+    if (cached && cached.expires > Date.now()) {
+        console.log(`[PREVIEW] Cache hit for ${videoId}`);
+        return Promise.resolve(cached.url);
+    }
+
+    const pending = pendingAudioUrlRequests.get(videoId);
+    if (pending) {
+        console.log(`[PREVIEW] Reusing in-flight lookup for ${videoId}`);
+        return pending;
+    }
+
+    const request = new Promise((resolve, reject) => {
+        let ytdlp;
+        try {
+            ytdlp = resolveYtdlpPath(settings, __dirname);
+        } catch (error) {
+            return reject(new Error('yt-dlp is unavailable'));
+        }
+
         const cached = audioUrlCache.get(videoId);
         if (cached && cached.expires > Date.now()) {
             console.log(`[PREVIEW] Cache hit for ${videoId}`);
             return resolve(cached.url);
         }
-
-        const ytdlp = getYtdlpPath();
         const args = [
             '-f', 'wa/w/ba/b',  // worst audio first — small and fast to stream for preview
             '--get-url',
@@ -86,10 +100,11 @@ function getAudioUrl(videoId) {
         console.log(`[PREVIEW] Getting URL for ${videoId}...`);
         const startTime = Date.now();
 
-        execFile(ytdlp, args, { timeout: 30000 }, (err, stdout, stderr) => {
+        execFile(ytdlp, args, { timeout: 20000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
             const elapsed = Date.now() - startTime;
             if (err) {
-                console.log(`[PREVIEW] Failed after ${elapsed}ms`);
+                const stderrSummary = (stderr || '').trim().split('\n').slice(-1)[0];
+                console.log(`[PREVIEW] Failed after ${elapsed}ms${stderrSummary ? `: ${stderrSummary}` : ''}`);
                 return reject(new Error('Could not get audio URL'));
             }
             const url = stdout.trim().split('\n')[0]; // take first URL only
@@ -100,28 +115,53 @@ function getAudioUrl(videoId) {
             audioUrlCache.set(videoId, { url, expires: Date.now() + 4 * 60 * 60 * 1000 });
             resolve(url);
         });
+    }).finally(() => {
+        pendingAudioUrlRequests.delete(videoId);
     });
+
+    pendingAudioUrlRequests.set(videoId, request);
+    return request;
 }
 
-// Pre-fetch URLs for search results — all in parallel
+// Pre-fetch URLs for search results — limited concurrency
 function prefetchUrls(videoIds) {
-    console.log(`[PREFETCH] Starting parallel fetch for ${videoIds.length} tracks...`);
-    for (const id of videoIds) {
+    // Clear old queue (new search replaces old)
+    prefetchQueue = [];
+    for (const id of videoIds.slice(0, PREFETCH_LIMIT)) {
         const cached = audioUrlCache.get(id);
-        if (cached && cached.expires > Date.now()) {
-            console.log(`[PREFETCH] ${id} already cached`);
-            continue;
-        }
-        activePrefetches++;
-        getAudioUrl(id)
-            .then(() => {
-                activePrefetches--;
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('prefetch:ready', id);
-                }
-            })
-            .catch(() => { activePrefetches--; });
+        if ((cached && cached.expires > Date.now()) || pendingAudioUrlRequests.has(id)) continue;
+        prefetchQueue.push(id);
     }
+    console.log(`[PREFETCH] Queued ${prefetchQueue.length} tracks (${PREFETCH_CONCURRENCY} concurrent, first ${PREFETCH_LIMIT} only)`);
+    // Kick off workers up to concurrency limit
+    for (let i = activePrefetches; i < PREFETCH_CONCURRENCY; i++) {
+        prefetchNext();
+    }
+}
+
+function prefetchNext() {
+    if (prefetchQueue.length === 0) return;
+    const videoId = prefetchQueue.shift();
+
+    // Skip if cached while waiting in queue
+    const cached = audioUrlCache.get(videoId);
+    if (cached && cached.expires > Date.now()) {
+        prefetchNext();
+        return;
+    }
+
+    activePrefetches++;
+    getAudioUrl(videoId)
+        .then(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('prefetch:ready', videoId);
+            }
+        })
+        .catch(() => {})
+        .finally(() => {
+            activePrefetches--;
+            prefetchNext(); // pick up next from queue
+        });
 }
 
 // --- IPC Handlers ---

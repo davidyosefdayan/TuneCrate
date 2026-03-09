@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -12,8 +12,25 @@ if (!fs.existsSync(BIN_DIR)) {
 const platform = os.platform();
 const arch = os.arch();
 
+function isWorkingBinary(binaryPath) {
+    try {
+        execFileSync(binaryPath, ['--version'], {
+            stdio: 'ignore',
+            timeout: 1500
+        });
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
 // yt-dlp
 const ytdlpPath = path.join(BIN_DIR, 'yt-dlp');
+if (fs.existsSync(ytdlpPath) && !isWorkingBinary(ytdlpPath)) {
+    console.log('Bundled yt-dlp is not responding, re-downloading...');
+    fs.unlinkSync(ytdlpPath);
+}
+
 if (!fs.existsSync(ytdlpPath)) {
     console.log('Downloading yt-dlp...');
     let ytdlpUrl;

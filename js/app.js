@@ -184,35 +184,32 @@ async function onHomeItemClick(item) {
         return;
     }
 
-    showSearchView();
-    document.getElementById('search-input').value = item.name;
-
-    const container = document.getElementById('search-results');
-    container.innerHTML = `
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <span>Loading playlist...</span>
-        </div>
-    `;
+    // Show playlist detail view
+    showPlaylistDetailView(item);
 
     // PL... playlists can be loaded directly. Others (RDCLAK, OLAK) fall back to search.
+    let tracks;
     if (item.playlistId && item.playlistId.startsWith('PL')) {
         try {
-            searchResults = await window.musicAPI.getPlaylistTracks(item.playlistId);
-            renderSearchResults(sortResults(searchResults));
-            return;
+            tracks = await window.musicAPI.getPlaylistTracks(item.playlistId);
         } catch (err) {
             // fall through to search
         }
     }
 
-    try {
-        const query = item.name + (item.artist ? ' ' + item.artist : '');
-        searchResults = await window.musicAPI.search(query);
-        renderSearchResults(sortResults(searchResults));
-    } catch (err) {
-        container.innerHTML = `<div class="empty-state">Could not load content</div>`;
+    if (!tracks || tracks.length === 0) {
+        try {
+            const query = item.name + (item.artist ? ' ' + item.artist : '');
+            tracks = await window.musicAPI.search(query);
+        } catch (err) {
+            document.getElementById('playlist-detail-tracks').innerHTML =
+                '<div class="empty-state">Could not load content</div>';
+            return;
+        }
     }
+
+    searchResults = tracks;
+    renderPlaylistDetailTracks(tracks);
 }
 
 // ============================================

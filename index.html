@@ -57,6 +57,24 @@
 
         <!-- Search results -->
         <div id="search-results" class="results-list hidden"></div>
+
+        <!-- Playlist detail view -->
+        <div id="playlist-detail" class="playlist-detail hidden">
+            <div class="playlist-detail-header">
+                <button id="playlist-detail-back" class="btn-icon playlist-back-btn" title="Back">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+                <img id="playlist-detail-thumb" class="playlist-detail-thumb" src="" alt="">
+                <div class="playlist-detail-info">
+                    <div id="playlist-detail-title" class="playlist-detail-title"></div>
+                    <div id="playlist-detail-artist" class="playlist-detail-artist"></div>
+                    <div id="playlist-detail-count" class="playlist-detail-count"></div>
+                </div>
+            </div>
+            <div id="playlist-detail-tracks" class="results-list"></div>
+        </div>
     </div>
 
     <!-- Library tab -->

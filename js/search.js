@@ -22,9 +22,11 @@ document.getElementById('search-sort').addEventListener('change', (e) => {
 function showSearchView() {
     isSearchActive = true;
     document.getElementById('home-view').classList.add('hidden');
+    document.getElementById('playlist-detail').classList.add('hidden');
     document.getElementById('search-results').classList.remove('hidden');
     document.getElementById('search-filters').classList.remove('hidden');
     document.getElementById('search-clear-btn').classList.remove('hidden');
+    document.querySelector('.search-bar').classList.remove('hidden');
 }
 
 function showHomeView() {
@@ -33,13 +35,57 @@ function showHomeView() {
     document.getElementById('search-results').classList.add('hidden');
     document.getElementById('search-filters').classList.add('hidden');
     document.getElementById('search-clear-btn').classList.add('hidden');
+    document.getElementById('playlist-detail').classList.add('hidden');
+    document.querySelector('.search-bar').classList.remove('hidden');
     document.getElementById('search-input').value = '';
     searchResults = [];
+}
+
+function showPlaylistDetailView(item) {
+    document.getElementById('home-view').classList.add('hidden');
+    document.getElementById('search-results').classList.add('hidden');
+    document.getElementById('search-filters').classList.add('hidden');
+    document.querySelector('.search-bar').classList.add('hidden');
+    document.getElementById('search-clear-btn').classList.add('hidden');
+
+    const detail = document.getElementById('playlist-detail');
+    detail.classList.remove('hidden');
+
+    document.getElementById('playlist-detail-thumb').src = item.thumbnail || item.thumbnailSmall || '';
+    document.getElementById('playlist-detail-title').textContent = item.name;
+    document.getElementById('playlist-detail-artist').textContent = item.artist || '';
+    document.getElementById('playlist-detail-count').textContent = '';
+
+    document.getElementById('playlist-detail-tracks').innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading tracks...</span>
+        </div>
+    `;
+}
+
+function renderPlaylistDetailTracks(tracks) {
+    const container = document.getElementById('playlist-detail-tracks');
+    const countEl = document.getElementById('playlist-detail-count');
+    countEl.textContent = tracks.length + ' track' + (tracks.length !== 1 ? 's' : '');
+
+    if (!tracks || tracks.length === 0) {
+        container.innerHTML = '<div class="empty-state">No tracks found</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    tracks.forEach(track => {
+        container.appendChild(createResultElement(track));
+    });
 }
 
 function clearSearch() {
     showHomeView();
 }
+
+// Back button from playlist detail
+document.getElementById('playlist-detail-back').addEventListener('click', showHomeView);
 
 function sortResults(results) {
     const sorted = [...results];

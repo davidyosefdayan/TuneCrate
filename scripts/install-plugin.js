@@ -1,3 +1,4 @@
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,33 +10,49 @@ const TARGET_DIR = path.join(
     PLUGIN_NAME
 );
 
+// Files/dirs to copy (exclude dev-only stuff)
+const INCLUDE = [
+    'manifest.xml',
+    'package.json',
+    'package-lock.json',
+    'main.js',
+    'preload.js',
+    'index.html',
+    'WorkflowIntegration.node',
+    'css',
+    'js',
+    'lib',
+    'node_modules',
+    'bin',
+    'scripts'
+];
+
 try {
-    // Create parent dir if needed
-    const parentDir = path.dirname(TARGET_DIR);
-    if (!fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
-    }
-
-    // Remove existing symlink/dir
+    // Remove existing install
     if (fs.existsSync(TARGET_DIR)) {
-        const stat = fs.lstatSync(TARGET_DIR);
-        if (stat.isSymbolicLink()) {
-            fs.unlinkSync(TARGET_DIR);
-        } else {
-            console.error(`Target exists and is not a symlink: ${TARGET_DIR}`);
-            console.error('Remove it manually first.');
-            process.exit(1);
-        }
+        console.log('Removing previous install...');
+        fs.rmSync(TARGET_DIR, { recursive: true, force: true });
     }
 
-    // Create symlink
-    fs.symlinkSync(SOURCE_DIR, TARGET_DIR, 'dir');
-    console.log(`Plugin installed! Symlinked to:\n  ${TARGET_DIR}\n`);
-    console.log('Open DaVinci Resolve Studio > Workspace > Workflow Integrations > YouTube Music');
+    // Create target dir
+    fs.mkdirSync(TARGET_DIR, { recursive: true });
+
+    // Copy each item
+    for (const item of INCLUDE) {
+        const src = path.join(SOURCE_DIR, item);
+        if (!fs.existsSync(src)) continue;
+        const dest = path.join(TARGET_DIR, item);
+        console.log(`  Copying ${item}...`);
+        fs.cpSync(src, dest, { recursive: true });
+    }
+
+    console.log(`\nPlugin installed to:\n  ${TARGET_DIR}\n`);
+    console.log('Restart DaVinci Resolve, then open:');
+    console.log('  Workspace > Workflow Integrations > YouTube Music');
 } catch (err) {
     if (err.code === 'EACCES') {
         console.error('Permission denied. Try running with sudo:');
-        console.error('  sudo node scripts/install-plugin.js');
+        console.error('  sudo npm run install-plugin');
     } else {
         console.error('Install failed:', err.message);
     }

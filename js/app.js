@@ -135,8 +135,12 @@ function renderHomeSections() {
         row.className = 'home-row';
 
         section.items.forEach(item => {
+            const isSong = item.type === 'SONG';
             const card = document.createElement('div');
-            card.className = 'home-card';
+            card.className = isSong ? 'home-card home-card-song' : 'home-card';
+
+            const thumbWrap = document.createElement('div');
+            thumbWrap.className = 'home-card-thumb-wrap';
 
             const thumb = document.createElement('img');
             thumb.className = 'home-card-thumb';
@@ -144,6 +148,15 @@ function renderHomeSections() {
             thumb.alt = '';
             thumb.loading = 'lazy';
             thumb.onerror = function() { this.style.background = 'var(--bg-tertiary)'; };
+
+            thumbWrap.appendChild(thumb);
+
+            if (isSong) {
+                const playOverlay = document.createElement('div');
+                playOverlay.className = 'home-card-play';
+                playOverlay.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><polygon points="6,3 20,12 6,21"/></svg>';
+                thumbWrap.appendChild(playOverlay);
+            }
 
             const info = document.createElement('div');
             info.className = 'home-card-info';
@@ -158,10 +171,9 @@ function renderHomeSections() {
 
             info.appendChild(name);
             info.appendChild(artist);
-            card.appendChild(thumb);
+            card.appendChild(thumbWrap);
             card.appendChild(info);
 
-            // Click behavior depends on type
             card.addEventListener('click', () => onHomeItemClick(item));
 
             row.appendChild(card);

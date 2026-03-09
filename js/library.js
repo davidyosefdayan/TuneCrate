@@ -76,8 +76,8 @@ function createDownloadItem(track) {
             e.stopPropagation();
             if (track.localPath) {
                 try {
-                    await window.resolveAPI.importToMediaPool(track.localPath);
-                    showToast('Imported to Media Pool', 'success');
+                    await window.resolveAPI.addToTimeline(track.localPath);
+                    showToast('Added to Timeline', 'success');
                 } catch (err) {
                     showToast('Import failed', 'error');
                 }
@@ -329,10 +329,10 @@ async function batchImport(playlistId) {
         const filePath = track.localPath || AppState.downloadedPaths[track.videoId];
         if (!filePath) continue;
         try {
-            await window.resolveAPI.importToMediaPool(filePath);
+            await window.resolveAPI.addToTimeline(filePath);
             imported++;
         } catch (e) { /* skip */ }
     }
 
-    showToast(`Imported ${imported} track${imported !== 1 ? 's' : ''} to Resolve`, 'success');
+    showToast(`Added ${imported} track${imported !== 1 ? 's' : ''} to Timeline`, 'success');
 }

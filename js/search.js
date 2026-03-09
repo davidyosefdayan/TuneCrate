@@ -213,7 +213,7 @@ function playTrack(videoId) {
     if (track) startPreview(track);
 }
 
-async function downloadTrack(videoId) {
+async function downloadTrack(videoId, { silent = false } = {}) {
     if (AppState.downloading.has(videoId) || AppState.downloadedPaths[videoId]) return;
 
     const track = findTrack(videoId);
@@ -224,7 +224,7 @@ async function downloadTrack(videoId) {
     AppState.downloading.add(videoId);
     AppState.downloadProgress[videoId] = 0;
     updateDownloadButton(videoId, 0);
-    showToast(`Downloading: ${track.title}`);
+    if (!silent) showToast(`Downloading: ${track.title}`);
 
     try {
         const filePath = await window.downloadAPI.start(videoId, track.title, format);
@@ -243,14 +243,14 @@ async function downloadTrack(videoId) {
         AppState.downloadHistory = await window.downloadAPI.getHistory();
         loadDownloads();
 
-        showToast(`Downloaded: ${track.title}`, 'success');
+        if (!silent) showToast(`Downloaded: ${track.title}`, 'success');
 
         // Auto-import if setting enabled
-        if (AppState.resolveAvailable) {
+        if (!silent && AppState.resolveAvailable) {
             const autoImport = await window.settingsAPI.get('autoImport');
             if (autoImport) {
-                await window.resolveAPI.importToMediaPool(filePath);
-                showToast('Imported to Media Pool', 'success');
+                await window.resolveAPI.addToTimeline(filePath);
+                showToast('Added to Timeline', 'success');
             }
         }
 
@@ -267,7 +267,7 @@ function updateDownloadButton(videoId, progress) {
     const el = document.querySelector(`.result-item[data-video-id="${videoId}"]`);
     if (!el) return;
 
-    // Update progress bar
+    // Update progress bar — show immediately (thin bar at ~5% during fetch phase)
     let progressBar = el.querySelector('.result-progress');
     if (!progressBar && progress < 100) {
         progressBar = document.createElement('div');
@@ -279,7 +279,7 @@ function updateDownloadButton(videoId, progress) {
         progressBar.style.width = `${progress}%`;
     }
 
-    // Update button
+    // Update button — use same spinner as play button loading
     const btn = el.querySelector('.download-btn');
     if (btn) {
         if (progress >= 100) {
@@ -290,9 +290,9 @@ function updateDownloadButton(videoId, progress) {
             if (progressBar) progressBar.remove();
             el.classList.remove('downloading');
         } else {
-            btn.innerHTML = spinnerIcon(progress);
+            btn.innerHTML = spinnerIcon();
             btn.classList.add('active');
-            btn.title = `Downloading ${Math.round(progress)}%`;
+            btn.title = progress > 0 ? `Downloading ${Math.round(progress)}%` : 'Fetching...';
         }
     }
 }
@@ -307,14 +307,30 @@ function refreshResultItem(videoId) {
 }
 
 async function importTrack(videoId) {
-    const filePath = AppState.downloadedPaths[videoId];
+    let filePath = AppState.downloadedPaths[videoId];
+
+    // Auto-download if not yet downloaded
     if (!filePath) {
-        showToast('Download the track first', 'error');
-        return;
+        try {
+            await downloadTrack(videoId, { silent: true });
+            filePath = AppState.downloadedPaths[videoId];
+        } catch (err) {
+            showToast('Download failed', 'error');
+            return;
+        }
+        if (!filePath) {
+            showToast('Download failed', 'error');
+            return;
+        }
     }
+
     try {
-        await window.resolveAPI.importToMediaPool(filePath);
-        showToast('Imported to Media Pool', 'success');
+        const result = await window.resolveAPI.addToTimeline(filePath);
+        if (result) {
+            showToast('Added to Timeline', 'success');
+        } else {
+            showToast('Failed to add to Timeline', 'error');
+        }
     } catch (err) {
         showToast('Import failed', 'error');
     }
@@ -343,7 +359,7 @@ function downloadIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 }
 function checkIcon() {
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
 }
 function plusIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
@@ -357,7 +373,6 @@ function folderIcon() {
 function loadingSmallIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" class="spin-anim"><circle cx="12" cy="12" r="9" stroke="var(--bg-elevated)" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/></svg>';
 }
-function spinnerIcon(progress) {
-    const pct = Math.round(progress);
-    return `<svg viewBox="0 0 24 24" class="spin-icon"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--bg-active)" stroke-width="2"/><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="56.5" stroke-dashoffset="${56.5 - (pct / 100) * 56.5}" stroke-linecap="round" transform="rotate(-90 12 12)"/><text x="12" y="15" text-anchor="middle" fill="var(--text-primary)" font-size="7" font-weight="600">${pct}</text></svg>`;
+function spinnerIcon() {
+    return loadingSmallIcon();
 }

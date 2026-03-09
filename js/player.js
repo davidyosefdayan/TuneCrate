@@ -24,8 +24,9 @@ document.getElementById('player-playlist-btn').addEventListener('click', () => {
     if (AppState.currentTrack) showAddToPlaylist(AppState.currentTrack.videoId);
 });
 
-document.getElementById('player-import-btn').addEventListener('click', () => {
-    if (AppState.currentTrack) importTrack(AppState.currentTrack.videoId);
+document.getElementById('player-import-btn').addEventListener('click', async () => {
+    if (!AppState.currentTrack) return;
+    importTrack(AppState.currentTrack.videoId);
 });
 
 function updateSeekBarFill() {
@@ -114,21 +115,28 @@ async function startPreview(track) {
     // Update play buttons in results — show loading spinner for current track
     updateListPlayButtons();
 
-    // Get audio URL (may be cached from pre-fetch, or takes ~15s via yt-dlp)
+    // Play from local file if already downloaded, otherwise stream
     try {
-        const cached = await window.appAPI.isPreviewCached(track.videoId);
-        if (!cached) {
-            showToast('Loading preview... this may take a moment');
-        }
+        const localPath = AppState.downloadedPaths[track.videoId] || track.localPath;
+        let playUrl;
 
-        const { url, error } = await window.appAPI.getPreviewUrl(track.videoId);
-        if (error || !url) throw new Error(error || 'No URL');
+        if (localPath) {
+            playUrl = 'file://' + localPath;
+        } else {
+            const cached = await window.appAPI.isPreviewCached(track.videoId);
+            if (!cached) {
+                showToast('Loading preview... this may take a moment');
+            }
+            const { url, error } = await window.appAPI.getPreviewUrl(track.videoId);
+            if (error || !url) throw new Error(error || 'No URL');
+            playUrl = url;
+        }
 
         // Check if user switched to a different track while we were loading
         if (AppState.currentTrack?.videoId !== track.videoId) return;
 
         audio.pause();
-        audio.src = url;
+        audio.src = playUrl;
         audio.load();
         await audio.play();
         isPlaying = true;
@@ -198,10 +206,10 @@ function updatePlayerActions() {
             dlBtn.classList.remove('active');
             dlBtn.title = 'Downloaded';
         } else if (isDownloading) {
-            dlBtn.innerHTML = spinnerIcon(progress);
+            dlBtn.innerHTML = spinnerIcon();
             dlBtn.classList.add('active');
             dlBtn.classList.remove('done');
-            dlBtn.title = `Downloading ${Math.round(progress)}%`;
+            dlBtn.title = progress > 0 ? `Downloading ${Math.round(progress)}%` : 'Fetching...';
         } else {
             dlBtn.innerHTML = downloadIcon();
             dlBtn.classList.remove('done', 'active');

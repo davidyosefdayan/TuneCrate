@@ -214,13 +214,15 @@ function registerIpcHandlers() {
         return !!(cached && cached.expires > Date.now());
     });
 
-    // Download
+    // Download — pass cached audio URL if available to skip re-fetching
     ipcMain.handle('download:start', async (event, videoId, title, format) => {
+        const cached = audioUrlCache.get(videoId);
+        const cachedUrl = (cached && cached.expires > Date.now()) ? cached.url : null;
         return await downloader.download(videoId, title, format, (progress) => {
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('download:progress', { videoId, progress });
             }
-        });
+        }, cachedUrl);
     });
     ipcMain.handle('download:cancel', (event, videoId) => {
         downloader.cancel(videoId);

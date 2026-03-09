@@ -514,9 +514,11 @@ body {
     position: absolute;
     bottom: 0;
     left: 0;
-    height: 2px;
+    height: 3px;
     background: var(--accent);
     z-index: 1;
+    transition: width 0.3s ease;
+    border-radius: 0 2px 2px 0;
 }
 
 .result-thumb {
@@ -597,24 +599,24 @@ body {
 }
 
 .action-btn.done {
-    background: #1a3d2a;
-    color: var(--success);
+    background: var(--bg-elevated);
+    color: var(--accent);
     cursor: default;
 }
 
 .action-btn.done:hover {
-    background: #1a3d2a;
-    color: var(--success);
+    background: var(--bg-elevated);
+    color: var(--accent);
 }
 
 .action-btn.active {
-    background: #2a1520;
+    background: var(--bg-elevated);
     color: var(--accent);
     cursor: default;
 }
 
 .action-btn.active:hover {
-    background: #2a1520;
+    background: var(--bg-elevated);
     color: var(--accent);
 }
 

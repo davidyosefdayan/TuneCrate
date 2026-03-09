@@ -174,7 +174,6 @@ function renderHomeSections() {
 
 async function onHomeItemClick(item) {
     if (item.type === 'SONG' && item.videoId) {
-        // Play the song directly
         startPreview({
             videoId: item.videoId,
             title: item.name,
@@ -182,44 +181,37 @@ async function onHomeItemClick(item) {
             duration: item.duration || 0,
             thumbnail: item.thumbnail
         });
-    } else if (item.type === 'PLAYLIST' && item.playlistId) {
-        // Load playlist tracks and show as search results
-        showSearchView();
-        document.getElementById('search-input').value = item.name;
+        return;
+    }
 
-        const container = document.getElementById('search-results');
-        container.innerHTML = `
-            <div class="loading-state">
-                <div class="spinner"></div>
-                <span>Loading playlist...</span>
-            </div>
-        `;
+    showSearchView();
+    document.getElementById('search-input').value = item.name;
 
+    const container = document.getElementById('search-results');
+    container.innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading playlist...</span>
+        </div>
+    `;
+
+    // PL... playlists can be loaded directly. Others (RDCLAK, OLAK) fall back to search.
+    if (item.playlistId && item.playlistId.startsWith('PL')) {
         try {
             searchResults = await window.musicAPI.getPlaylistTracks(item.playlistId);
             renderSearchResults(sortResults(searchResults));
+            return;
         } catch (err) {
-            container.innerHTML = `<div class="empty-state">Could not load playlist</div>`;
+            // fall through to search
         }
-    } else if (item.type === 'ALBUM' && item.playlistId) {
-        // Albums also have a playlistId for their tracks
-        showSearchView();
-        document.getElementById('search-input').value = item.name + ' - ' + item.artist;
+    }
 
-        const container = document.getElementById('search-results');
-        container.innerHTML = `
-            <div class="loading-state">
-                <div class="spinner"></div>
-                <span>Loading album...</span>
-            </div>
-        `;
-
-        try {
-            searchResults = await window.musicAPI.getPlaylistTracks(item.playlistId);
-            renderSearchResults(sortResults(searchResults));
-        } catch (err) {
-            container.innerHTML = `<div class="empty-state">Could not load album</div>`;
-        }
+    try {
+        const query = item.name + (item.artist ? ' ' + item.artist : '');
+        searchResults = await window.musicAPI.search(query);
+        renderSearchResults(sortResults(searchResults));
+    } catch (err) {
+        container.innerHTML = `<div class="empty-state">Could not load content</div>`;
     }
 }
 

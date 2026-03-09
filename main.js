@@ -194,18 +194,19 @@ function registerIpcHandlers() {
         return results;
     });
 
-    // Home sections
-    ipcMain.handle('music:getHomeSections', async () => {
-        return await ytmusic.getHomeSections();
-    });
-
-    // Get playlist tracks (for browsing playlists from home)
+    // Get playlist tracks (tries direct fetch, caller handles errors)
     ipcMain.handle('music:getPlaylistTracks', async (event, playlistId) => {
         const results = await ytmusic.getPlaylistTracks(playlistId);
         const allIds = results.map(r => r.videoId).filter(Boolean);
         prefetchUrls(allIds);
         return results;
     });
+
+    // Home sections
+    ipcMain.handle('music:getHomeSections', async () => {
+        return await ytmusic.getHomeSections();
+    });
+
 
     // Check if a preview URL is cached (for UI status)
     ipcMain.handle('app:isPreviewCached', (event, videoId) => {

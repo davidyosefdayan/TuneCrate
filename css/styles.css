@@ -310,6 +310,10 @@ html, body {
     height: 14px;
 }
 
+.action-btn.ready {
+    color: var(--accent);
+}
+
 .action-btn.done {
     background: rgba(46, 204, 113, 0.15);
     cursor: default;

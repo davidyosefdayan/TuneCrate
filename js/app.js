@@ -57,6 +57,12 @@ async function initApp() {
         document.getElementById('resolve-status').className = 'status-badge connected';
     }
 
+    // Listen for prefetch completions — update play buttons
+    window.appAPI.onPrefetchReady((videoId) => {
+        const btn = document.querySelector(`.result-item[data-video-id="${videoId}"] .play-btn`);
+        if (btn) btn.classList.add('ready');
+    });
+
     // Listen for download progress
     window.downloadAPI.onProgress(({ videoId, progress }) => {
         AppState.downloadProgress[videoId] = progress;

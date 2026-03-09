@@ -55,8 +55,8 @@ console.log('[BOOT] Instances created');
 
 // --- Audio preview: get direct URL via yt-dlp ---
 let audioUrlCache = new Map(); // videoId -> { url, expires }
-let prefetchQueue = [];
-let prefetching = false;
+const PREFETCH_CONCURRENCY = 3; // parallel yt-dlp processes
+let activePrefetches = 0;
 
 function getYtdlpPath() {
     const bundled = path.join(__dirname, 'bin', 'yt-dlp');
@@ -103,36 +103,25 @@ function getAudioUrl(videoId) {
     });
 }
 
-// Pre-fetch URLs for search results in background
+// Pre-fetch URLs for search results — all in parallel
 function prefetchUrls(videoIds) {
-    // Add to queue, skip already cached
+    console.log(`[PREFETCH] Starting parallel fetch for ${videoIds.length} tracks...`);
     for (const id of videoIds) {
         const cached = audioUrlCache.get(id);
-        if (cached && cached.expires > Date.now()) continue;
-        if (!prefetchQueue.includes(id)) {
-            prefetchQueue.push(id);
+        if (cached && cached.expires > Date.now()) {
+            console.log(`[PREFETCH] ${id} already cached`);
+            continue;
         }
+        activePrefetches++;
+        getAudioUrl(id)
+            .then(() => {
+                activePrefetches--;
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('prefetch:ready', id);
+                }
+            })
+            .catch(() => { activePrefetches--; });
     }
-    processPrefetchQueue();
-}
-
-async function processPrefetchQueue() {
-    if (prefetching || prefetchQueue.length === 0) return;
-    prefetching = true;
-
-    while (prefetchQueue.length > 0) {
-        const videoId = prefetchQueue.shift();
-        // Skip if already cached while waiting
-        const cached = audioUrlCache.get(videoId);
-        if (cached && cached.expires > Date.now()) continue;
-
-        try {
-            await getAudioUrl(videoId);
-        } catch (e) {
-            // Ignore prefetch failures
-        }
-    }
-    prefetching = false;
 }
 
 // --- IPC Handlers ---
@@ -158,9 +147,9 @@ function registerIpcHandlers() {
     // Music search
     ipcMain.handle('music:search', async (event, query) => {
         const results = await ytmusic.search(query);
-        // Pre-fetch audio URLs for top 3 results in background
-        const topIds = results.slice(0, 3).map(r => r.videoId);
-        prefetchUrls(topIds);
+        // Pre-fetch audio URLs for all results in parallel
+        const allIds = results.map(r => r.videoId);
+        prefetchUrls(allIds);
         return results;
     });
 

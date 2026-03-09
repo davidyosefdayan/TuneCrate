@@ -1,7 +1,6 @@
 // Global state
 const AppState = {
     resolveAvailable: false,
-    previewPort: 0,
     currentTrack: null,
     downloadProgress: {},   // videoId -> percent
     downloadedPaths: {},    // videoId -> filePath
@@ -50,7 +49,6 @@ function escapeHtml(str) {
 // Initialize
 async function initApp() {
     AppState.resolveAvailable = await window.appAPI.isResolveAvailable();
-    AppState.previewPort = await window.appAPI.getPreviewPort();
 
     // Show/hide Resolve-only elements
     if (AppState.resolveAvailable) {

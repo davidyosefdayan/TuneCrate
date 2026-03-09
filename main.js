@@ -53,11 +53,10 @@ const downloader = new AudioDownloader(settings);
 let resolveBridge = null;
 console.log('[BOOT] Instances created');
 
-// --- Audio preview via yt-dlp ---
-// Use yt-dlp to get a direct audio URL, then proxy it through a local server
-const http = require('http');
-let previewServer = null;
+// --- Audio preview: get direct URL via yt-dlp ---
 let audioUrlCache = new Map(); // videoId -> { url, expires }
+let prefetchQueue = [];
+let prefetching = false;
 
 function getYtdlpPath() {
     const bundled = path.join(__dirname, 'bin', 'yt-dlp');
@@ -69,103 +68,85 @@ function getAudioUrl(videoId) {
     return new Promise((resolve, reject) => {
         const cached = audioUrlCache.get(videoId);
         if (cached && cached.expires > Date.now()) {
+            console.log(`[PREVIEW] Cache hit for ${videoId}`);
             return resolve(cached.url);
         }
 
         const ytdlp = getYtdlpPath();
         const args = [
-            '-f', 'bestaudio',
+            '-f', 'wa/w/ba/b',  // worst audio first — small and fast to stream for preview
             '--get-url',
             '--no-playlist',
+            '--no-warnings',
             '--js-runtimes', 'node',
+            '--extractor-args', 'youtube:player_client=default,web_music',
             `https://www.youtube.com/watch?v=${videoId}`
         ];
 
-        execFile(ytdlp, args, { timeout: 15000 }, (err, stdout, stderr) => {
-            if (err) return reject(new Error(stderr || err.message));
-            const url = stdout.trim();
-            if (!url) return reject(new Error('No URL returned'));
-            // Cache for 5 minutes (YouTube URLs expire)
-            audioUrlCache.set(videoId, { url, expires: Date.now() + 5 * 60 * 1000 });
+        console.log(`[PREVIEW] Getting URL for ${videoId}...`);
+        const startTime = Date.now();
+
+        execFile(ytdlp, args, { timeout: 30000 }, (err, stdout, stderr) => {
+            const elapsed = Date.now() - startTime;
+            if (err) {
+                console.log(`[PREVIEW] Failed after ${elapsed}ms`);
+                return reject(new Error('Could not get audio URL'));
+            }
+            const url = stdout.trim().split('\n')[0]; // take first URL only
+            if (!url || !url.startsWith('http')) return reject(new Error('No URL returned'));
+
+            console.log(`[PREVIEW] Got URL in ${elapsed}ms`);
+            // Cache for 4 hours (YouTube URLs expire after ~6h)
+            audioUrlCache.set(videoId, { url, expires: Date.now() + 4 * 60 * 60 * 1000 });
             resolve(url);
         });
     });
 }
 
-function startPreviewServer() {
-    previewServer = http.createServer(async (req, res) => {
-        const reqUrl = new URL(req.url, 'http://localhost');
-        const videoId = reqUrl.searchParams.get('id');
-
-        if (!videoId) {
-            res.writeHead(400);
-            res.end('Missing id');
-            return;
+// Pre-fetch URLs for search results in background
+function prefetchUrls(videoIds) {
+    // Add to queue, skip already cached
+    for (const id of videoIds) {
+        const cached = audioUrlCache.get(id);
+        if (cached && cached.expires > Date.now()) continue;
+        if (!prefetchQueue.includes(id)) {
+            prefetchQueue.push(id);
         }
+    }
+    processPrefetchQueue();
+}
+
+async function processPrefetchQueue() {
+    if (prefetching || prefetchQueue.length === 0) return;
+    prefetching = true;
+
+    while (prefetchQueue.length > 0) {
+        const videoId = prefetchQueue.shift();
+        // Skip if already cached while waiting
+        const cached = audioUrlCache.get(videoId);
+        if (cached && cached.expires > Date.now()) continue;
 
         try {
-            const audioUrl = await getAudioUrl(videoId);
-
-            // Use native fetch/https to proxy the audio
-            const https = require('https');
-            const parsedUrl = new URL(audioUrl);
-
-            const proxyReq = https.request(parsedUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0',
-                    ...(req.headers.range ? { Range: req.headers.range } : {})
-                }
-            }, (proxyRes) => {
-                const headers = {
-                    'Content-Type': proxyRes.headers['content-type'] || 'audio/webm',
-                    'Access-Control-Allow-Origin': '*',
-                    'Accept-Ranges': 'bytes'
-                };
-                if (proxyRes.headers['content-length']) headers['Content-Length'] = proxyRes.headers['content-length'];
-                if (proxyRes.headers['content-range']) headers['Content-Range'] = proxyRes.headers['content-range'];
-
-                res.writeHead(proxyRes.statusCode, headers);
-                proxyRes.pipe(res);
-            });
-
-            proxyReq.on('error', () => {
-                if (!res.headersSent) { res.writeHead(502); res.end('Proxy error'); }
-            });
-            req.on('close', () => proxyReq.destroy());
-            proxyReq.end();
-        } catch (err) {
-            if (!res.headersSent) {
-                res.writeHead(500);
-                res.end('Preview error: ' + err.message);
-            }
+            await getAudioUrl(videoId);
+        } catch (e) {
+            // Ignore prefetch failures
         }
-    });
-
-    previewServer.listen(0, '127.0.0.1', () => {
-        console.log(`Preview server on port ${previewServer.address().port}`);
-    });
-}
-
-function getPreviewPort() {
-    return previewServer ? previewServer.address().port : 0;
-}
-
-// --- IPC: get audio URL for preview (renderer fetches directly) ---
-async function handleGetPreviewUrl(event, videoId) {
-    try {
-        const port = getPreviewPort();
-        return { url: `http://127.0.0.1:${port}/stream?id=${videoId}`, error: null };
-    } catch (err) {
-        return { url: null, error: err.message };
     }
+    prefetching = false;
 }
 
 // --- IPC Handlers ---
 function registerIpcHandlers() {
     // App
     ipcMain.handle('app:isResolveAvailable', () => resolveAvailable);
-    ipcMain.handle('app:getPreviewPort', () => getPreviewPort());
-    ipcMain.handle('app:getPreviewUrl', handleGetPreviewUrl);
+    ipcMain.handle('app:getPreviewUrl', async (event, videoId) => {
+        try {
+            const url = await getAudioUrl(videoId);
+            return { url, error: null };
+        } catch (err) {
+            return { url: null, error: err.message };
+        }
+    });
     ipcMain.handle('app:showInFinder', (event, filePath) => {
         shell.showItemInFolder(filePath);
     });
@@ -176,7 +157,17 @@ function registerIpcHandlers() {
 
     // Music search
     ipcMain.handle('music:search', async (event, query) => {
-        return await ytmusic.search(query);
+        const results = await ytmusic.search(query);
+        // Pre-fetch audio URLs for top 3 results in background
+        const topIds = results.slice(0, 3).map(r => r.videoId);
+        prefetchUrls(topIds);
+        return results;
+    });
+
+    // Check if a preview URL is cached (for UI status)
+    ipcMain.handle('app:isPreviewCached', (event, videoId) => {
+        const cached = audioUrlCache.get(videoId);
+        return !!(cached && cached.expires > Date.now());
     });
 
     // Download
@@ -247,17 +238,12 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
 
-    // Debug: open DevTools to see renderer errors
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-
     mainWindow.on('close', () => {
-        if (previewServer) previewServer.close();
         app.quit();
     });
 }
 
 // --- Prevent singleton lock conflict when Resolve plugin is also running ---
-// Detect if we're running from the Resolve plugins directory or standalone
 const isInsideResolve = __dirname.includes('Workflow Integration Plugins');
 if (!isInsideResolve) {
     app.setPath('userData', path.join(app.getPath('appData'), 'YouTube Music Resolve Standalone'));
@@ -285,8 +271,6 @@ app.whenReady().then(async () => {
         console.log('[BOOT] Standalone mode — skipping Resolve connection');
     }
 
-    console.log('[BOOT] Starting preview server...');
-    startPreviewServer();
     console.log('[BOOT] Registering IPC...');
     registerIpcHandlers();
     console.log('[BOOT] Creating window...');

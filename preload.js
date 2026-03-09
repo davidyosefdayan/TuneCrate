@@ -35,8 +35,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
 
 contextBridge.exposeInMainWorld('appAPI', {
     isResolveAvailable: () => ipcRenderer.invoke('app:isResolveAvailable'),
-    getPreviewPort: () => ipcRenderer.invoke('app:getPreviewPort'),
     getPreviewUrl: (videoId) => ipcRenderer.invoke('app:getPreviewUrl', videoId),
+    isPreviewCached: (videoId) => ipcRenderer.invoke('app:isPreviewCached', videoId),
     showInFinder: (filePath) => ipcRenderer.invoke('app:showInFinder', filePath),
     openDownloadDir: () => ipcRenderer.invoke('app:openDownloadDir'),
 });

@@ -35,6 +35,11 @@ audio.addEventListener('loadedmetadata', () => {
     }
 });
 
+audio.addEventListener('canplay', () => {
+    isLoadingPreview = false;
+    updatePlayerIcons();
+});
+
 audio.addEventListener('playing', () => {
     isPlaying = true;
     isLoadingPreview = false;
@@ -51,16 +56,12 @@ audio.addEventListener('ended', () => {
     updatePlayerIcons();
 });
 
-audio.addEventListener('waiting', () => {
-    isLoadingPreview = true;
-    updatePlayerIcons();
-});
-
 audio.addEventListener('error', (e) => {
+    console.error('Audio error:', audio.error);
     isPlaying = false;
     isLoadingPreview = false;
     updatePlayerIcons();
-    showToast('Preview unavailable — try again', 'error');
+    showToast('Preview failed — try again', 'error');
 });
 
 async function startPreview(track) {
@@ -96,17 +97,32 @@ async function startPreview(track) {
         btn.innerHTML = item.dataset.videoId === track.videoId ? pauseSmallIcon() : playSmallIcon();
     });
 
-    // Get stream URL via yt-dlp and proxy
+    // Get audio URL (may be cached from pre-fetch, or takes ~15s via yt-dlp)
     try {
+        const cached = await window.appAPI.isPreviewCached(track.videoId);
+        if (!cached) {
+            showToast('Loading preview... this may take a moment');
+        }
+
         const { url, error } = await window.appAPI.getPreviewUrl(track.videoId);
         if (error || !url) throw new Error(error || 'No URL');
 
+        // Check if user switched to a different track while we were loading
+        if (AppState.currentTrack?.videoId !== track.videoId) return;
+
+        audio.pause();
         audio.src = url;
+        audio.load();
         await audio.play();
-    } catch (e) {
+        isPlaying = true;
         isLoadingPreview = false;
         updatePlayerIcons();
-        showToast('Could not load preview', 'error');
+    } catch (e) {
+        console.error('Preview error:', e);
+        isLoadingPreview = false;
+        isPlaying = false;
+        updatePlayerIcons();
+        showToast('Could not load preview — try again', 'error');
     }
 }
 

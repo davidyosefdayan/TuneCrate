@@ -371,8 +371,8 @@ function folderIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
 }
 function loadingSmallIcon() {
-    return '<svg viewBox="0 0 24 24" fill="none" class="spin-anim"><circle cx="12" cy="12" r="9" stroke="var(--bg-elevated)" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/></svg>';
+    return '<div class="spinner-small"></div>';
 }
 function spinnerIcon() {
-    return loadingSmallIcon();
+    return '<div class="spinner-small"></div>';
 }

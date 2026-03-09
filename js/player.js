@@ -2,6 +2,7 @@
 let audio = new Audio();
 let isPlaying = false;
 let isLoadingPreview = false;
+let currentLoadId = 0; // incremented on each startPreview to detect stale loads
 
 const playerBar = document.getElementById('player-bar');
 const playerThumb = document.getElementById('player-thumb');
@@ -29,19 +30,39 @@ document.getElementById('player-import-btn').addEventListener('click', async () 
     importTrack(AppState.currentTrack.videoId);
 });
 
+let isSeeking = false;
+
 function updateSeekBarFill() {
     const pct = seekBar.value;
     seekBar.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--bg-elevated) ${pct}%)`;
 }
 
+seekBar.addEventListener('mousedown', () => { isSeeking = true; });
+seekBar.addEventListener('touchstart', () => { isSeeking = true; });
+
 seekBar.addEventListener('input', () => {
+    updateSeekBarFill();
+    // Show time preview while dragging
+    if (audio.duration && isFinite(audio.duration)) {
+        playerTime.textContent = formatDuration((seekBar.value / 100) * audio.duration);
+    }
+});
+
+seekBar.addEventListener('mouseup', () => {
     if (audio.duration && isFinite(audio.duration)) {
         audio.currentTime = (seekBar.value / 100) * audio.duration;
     }
-    updateSeekBarFill();
+    isSeeking = false;
+});
+seekBar.addEventListener('touchend', () => {
+    if (audio.duration && isFinite(audio.duration)) {
+        audio.currentTime = (seekBar.value / 100) * audio.duration;
+    }
+    isSeeking = false;
 });
 
 audio.addEventListener('timeupdate', () => {
+    if (isSeeking) return; // Don't fight with user dragging
     if (audio.duration && isFinite(audio.duration)) {
         seekBar.value = (audio.currentTime / audio.duration) * 100;
         playerTime.textContent = formatDuration(audio.currentTime);
@@ -76,21 +97,34 @@ audio.addEventListener('ended', () => {
     updatePlayerIcons();
 });
 
-audio.addEventListener('error', (e) => {
-    console.error('Audio error:', audio.error);
+// Error handler — do NOT show toast here; startPreview handles errors with retry
+audio.addEventListener('error', () => {
     isPlaying = false;
     isLoadingPreview = false;
     updatePlayerIcons();
-    showToast('Preview failed — try again', 'error');
 });
+
+async function getPlayUrl(track) {
+    // 1. Try local file if downloaded
+    const localPath = AppState.downloadedPaths[track.videoId] || track.localPath;
+    if (localPath) {
+        return 'local-audio://' + encodeURIComponent(localPath);
+    }
+
+    // 2. Try cached/fetched streaming URL
+    const { url, error } = await window.appAPI.getPreviewUrl(track.videoId);
+    if (error || !url) throw new Error(error || 'No URL');
+    return url;
+}
 
 async function startPreview(track) {
     // If same track, just toggle
-    if (AppState.currentTrack?.videoId === track.videoId) {
+    if (AppState.currentTrack?.videoId === track.videoId && !isLoadingPreview) {
         togglePlayPause();
         return;
     }
 
+    const loadId = ++currentLoadId;
     AppState.currentTrack = track;
 
     // Show player bar with loading state
@@ -99,6 +133,7 @@ async function startPreview(track) {
     playerTitle.textContent = track.title;
     playerSubtitle.textContent = track.album ? `${track.artist} · ${track.album}` : track.artist;
     seekBar.value = 0;
+    updateSeekBarFill();
     playerTime.textContent = '0:00';
     playerDuration.textContent = formatDuration(track.duration);
 
@@ -111,44 +146,59 @@ async function startPreview(track) {
     document.querySelectorAll('.result-item').forEach(el => {
         el.classList.toggle('playing', el.dataset.videoId === track.videoId);
     });
-
-    // Update play buttons in results — show loading spinner for current track
     updateListPlayButtons();
 
-    // Play from local file if already downloaded, otherwise stream
-    try {
-        const localPath = AppState.downloadedPaths[track.videoId] || track.localPath;
-        let playUrl;
+    // Try up to 3 times: first with cache, then force fresh URL
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        // Bail if user switched tracks
+        if (currentLoadId !== loadId) return;
 
-        if (localPath) {
-            playUrl = 'file://' + localPath;
-        } else {
-            const cached = await window.appAPI.isPreviewCached(track.videoId);
-            if (!cached) {
-                showToast('Loading preview... this may take a moment');
+        try {
+            if (attempt === 1) {
+                const cached = await window.appAPI.isPreviewCached(track.videoId);
+                if (!cached && !AppState.downloadedPaths[track.videoId] && !track.localPath) {
+                    showToast('Loading preview...');
+                }
             }
-            const { url, error } = await window.appAPI.getPreviewUrl(track.videoId);
-            if (error || !url) throw new Error(error || 'No URL');
-            playUrl = url;
+
+            const playUrl = await getPlayUrl(track);
+            if (currentLoadId !== loadId) return;
+
+            // Stop any current playback cleanly
+            audio.pause();
+            audio.removeAttribute('src');
+            audio.load();
+
+            audio.src = playUrl;
+            audio.load();
+            await audio.play();
+
+            // Success
+            isPlaying = true;
+            isLoadingPreview = false;
+            updatePlayerIcons();
+            return;
+        } catch (e) {
+            console.warn(`[PLAYER] Attempt ${attempt}/${MAX_RETRIES} failed:`, e.message);
+
+            if (currentLoadId !== loadId) return;
+
+            // On retry, invalidate the cached URL so we get a fresh one
+            if (attempt < MAX_RETRIES) {
+                await window.appAPI.invalidatePreviewCache?.(track.videoId);
+                // Small delay before retry
+                await new Promise(r => setTimeout(r, 1000));
+            }
         }
-
-        // Check if user switched to a different track while we were loading
-        if (AppState.currentTrack?.videoId !== track.videoId) return;
-
-        audio.pause();
-        audio.src = playUrl;
-        audio.load();
-        await audio.play();
-        isPlaying = true;
-        isLoadingPreview = false;
-        updatePlayerIcons();
-    } catch (e) {
-        console.error('Preview error:', e);
-        isLoadingPreview = false;
-        isPlaying = false;
-        updatePlayerIcons();
-        showToast('Could not load preview — try again', 'error');
     }
+
+    // All retries exhausted
+    if (currentLoadId !== loadId) return;
+    isLoadingPreview = false;
+    isPlaying = false;
+    updatePlayerIcons();
+    showToast('Could not load preview', 'error');
 }
 
 function togglePlayPause() {
@@ -158,7 +208,10 @@ function togglePlayPause() {
     if (isPlaying) {
         audio.pause();
     } else {
-        audio.play();
+        audio.play().catch(() => {
+            // If play fails (stale URL), retry with startPreview
+            startPreview(AppState.currentTrack);
+        });
     }
 }
 

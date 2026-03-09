@@ -10,8 +10,9 @@ if (typeof globalThis.FormData === 'undefined') {
 }
 
 console.log('[BOOT] Starting...');
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, net, protocol } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { execFile } = require('child_process');
 
 const PLUGIN_ID = 'com.daviddayan.resolve.youtubemusic';
@@ -214,6 +215,11 @@ function registerIpcHandlers() {
         return !!(cached && cached.expires > Date.now());
     });
 
+    // Invalidate cached preview URL (for retry on failure)
+    ipcMain.handle('app:invalidatePreviewCache', (event, videoId) => {
+        audioUrlCache.delete(videoId);
+    });
+
     // Download — pass cached audio URL if available to skip re-fetching
     ipcMain.handle('download:start', async (event, videoId, title, format) => {
         const cached = audioUrlCache.get(videoId);
@@ -297,9 +303,20 @@ if (!isInsideResolve) {
     app.setPath('userData', path.join(app.getPath('appData'), 'YouTube Music Resolve Standalone'));
 }
 
+// --- Custom protocol for local audio playback ---
+protocol.registerSchemesAsPrivileged([{
+    scheme: 'local-audio',
+    privileges: { stream: true, bypassCSP: true }
+}]);
+
 // --- App lifecycle ---
 console.log('[BOOT] Waiting for app ready...');
 app.whenReady().then(async () => {
+    // Register protocol handler for local audio files
+    protocol.handle('local-audio', (request) => {
+        const filePath = decodeURIComponent(request.url.replace('local-audio://', ''));
+        return net.fetch('file://' + filePath);
+    });
     console.log('[BOOT] App ready');
     // Only try to connect to Resolve if we're running from the plugins directory
     if (WorkflowIntegration && isInsideResolve) {

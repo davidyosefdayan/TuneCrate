@@ -609,15 +609,17 @@ body {
     color: var(--accent);
 }
 
-.action-btn.active {
-    background: var(--bg-elevated);
-    color: var(--accent);
+.action-btn.active,
+.action-btn.loading {
+    background: var(--accent);
+    color: white;
     cursor: default;
 }
 
-.action-btn.active:hover {
-    background: var(--bg-elevated);
-    color: var(--accent);
+.action-btn.active:hover,
+.action-btn.loading:hover {
+    background: var(--accent);
+    color: white;
 }
 
 .spin-icon {
@@ -626,15 +628,6 @@ body {
 
 .spin-anim {
     animation: spin 0.8s linear infinite;
-}
-
-.action-btn.loading {
-    cursor: default;
-}
-
-.action-btn.loading:hover {
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
 }
 
 /* ============================================

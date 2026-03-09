@@ -447,6 +447,7 @@ body {
     font-size: 10px;
     color: var(--text-muted);
     margin-top: 2px;
+    min-height: 1em;
 }
 
 .playlist-detail-tracks {

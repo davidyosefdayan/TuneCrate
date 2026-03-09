@@ -54,7 +54,7 @@ function showPlaylistDetailView(item) {
     document.getElementById('playlist-detail-thumb').src = item.thumbnail || item.thumbnailSmall || '';
     document.getElementById('playlist-detail-title').textContent = item.name;
     document.getElementById('playlist-detail-artist').textContent = item.artist || '';
-    document.getElementById('playlist-detail-count').textContent = '';
+    document.getElementById('playlist-detail-count').textContent = '\u00A0';
 
     document.getElementById('playlist-detail-tracks').innerHTML = `
         <div class="loading-state">

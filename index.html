@@ -30,7 +30,12 @@
             </button>
         </div>
         <div id="search-results" class="results-list">
-            <div class="empty-state">Search for music to get started</div>
+            <div class="empty-state">
+                <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                Search for music to get started
+            </div>
         </div>
     </div>
 
@@ -41,7 +46,12 @@
             <button id="create-playlist-btn" class="btn-small">+ New Playlist</button>
         </div>
         <div id="playlists-container" class="playlists-list">
-            <div class="empty-state">No playlists yet</div>
+            <div class="empty-state">
+                <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                </svg>
+                No playlists yet
+            </div>
         </div>
     </div>
 
@@ -97,11 +107,11 @@
             <div id="player-title" class="player-title">-</div>
             <div id="player-artist" class="player-artist">-</div>
         </div>
-        <button id="player-play-btn" class="btn-icon player-btn" title="Play/Pause">
-            <svg id="play-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <button id="player-play-btn" class="player-btn" title="Play/Pause">
+            <svg id="play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="6,3 20,12 6,21"/>
             </svg>
-            <svg id="pause-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+            <svg id="pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:none">
                 <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
             </svg>
             <div id="loading-icon" class="player-loading" style="display:none">
@@ -111,10 +121,12 @@
         <div class="player-seek-area">
             <div class="player-times">
                 <span id="player-time" class="player-time">0:00</span>
-                <span id="player-duration" class="player-time">0:00</span>
             </div>
             <div class="player-seek">
                 <input type="range" id="player-seek-bar" min="0" max="100" value="0" step="0.1">
+            </div>
+            <div class="player-times">
+                <span id="player-duration" class="player-time">0:00</span>
             </div>
         </div>
     </div>

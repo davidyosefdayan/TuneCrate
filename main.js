@@ -237,7 +237,6 @@ function createWindow() {
         alwaysOnTop: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: true,
             contextIsolation: true
         }
     });
@@ -248,6 +247,13 @@ function createWindow() {
         if (previewServer) previewServer.close();
         app.quit();
     });
+}
+
+// --- Prevent singleton lock conflict when Resolve plugin is also running ---
+// Detect if we're running from the Resolve plugins directory or standalone
+const isInsideResolve = __dirname.includes('Workflow Integration Plugins');
+if (!isInsideResolve) {
+    app.setPath('userData', path.join(app.getPath('appData'), 'YouTube Music Resolve Standalone'));
 }
 
 // --- App lifecycle ---

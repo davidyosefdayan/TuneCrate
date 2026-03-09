@@ -89,7 +89,7 @@ html, body {
 /* Tab content */
 .tab-content {
     display: none;
-    height: calc(100vh - 38px - 40px - 64px);
+    height: calc(100vh - 38px - 40px - 72px);
     overflow-y: auto;
     padding: 12px;
 }
@@ -199,7 +199,7 @@ html, body {
 .results-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .result-item {
@@ -211,6 +211,8 @@ html, body {
     border-radius: var(--radius);
     cursor: pointer;
     transition: background 0.15s;
+    position: relative;
+    overflow: hidden;
 }
 
 .result-item:hover {
@@ -219,6 +221,22 @@ html, body {
 
 .result-item.playing {
     background: var(--accent-dim);
+}
+
+.result-item.downloading {
+    background: var(--bg-secondary);
+}
+
+/* Download progress bar overlay */
+.result-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+    border-radius: 0 2px 0 0;
+    z-index: 1;
 }
 
 .result-thumb {
@@ -234,6 +252,7 @@ html, body {
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .result-title {
@@ -257,18 +276,13 @@ html, body {
     font-size: 11px;
     color: var(--text-muted);
     flex-shrink: 0;
+    margin-right: 4px;
 }
 
 .result-actions {
     display: flex;
     gap: 4px;
     flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-
-.result-item:hover .result-actions {
-    opacity: 1;
 }
 
 .action-btn {
@@ -284,15 +298,11 @@ html, body {
     cursor: pointer;
     font-size: 12px;
     transition: all 0.15s;
+    position: relative;
 }
 
 .action-btn:hover {
     background: var(--accent);
-}
-
-.action-btn.downloading {
-    background: var(--accent-dim);
-    cursor: default;
 }
 
 .action-btn svg {
@@ -300,36 +310,27 @@ html, body {
     height: 14px;
 }
 
-/* Download progress */
-.download-progress {
-    position: relative;
-    width: 28px;
-    height: 28px;
+.action-btn.done {
+    background: rgba(46, 204, 113, 0.15);
+    cursor: default;
 }
 
-.download-progress .progress-ring {
-    transform: rotate(-90deg);
+.action-btn.done:hover {
+    background: rgba(46, 204, 113, 0.25);
 }
 
-.download-progress .progress-ring-bg {
-    stroke: var(--bg-active);
+.action-btn.active {
+    background: var(--accent-dim);
+    cursor: default;
 }
 
-.download-progress .progress-ring-fill {
-    stroke: var(--accent);
-    transition: stroke-dashoffset 0.3s;
+.action-btn.active:hover {
+    background: var(--accent-dim);
 }
 
-/* Format dropdown */
-.format-select {
-    background: var(--bg-active);
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: 11px;
-    padding: 4px 6px;
-    cursor: pointer;
-    outline: none;
+/* Spinning download icon */
+.spin-icon {
+    animation: none;
 }
 
 /* Player bar */
@@ -338,7 +339,7 @@ html, body {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    height: 72px;
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     display: flex;
@@ -353,8 +354,8 @@ html, body {
 }
 
 .player-thumb {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: var(--radius-sm);
     object-fit: cover;
     flex-shrink: 0;
@@ -363,7 +364,7 @@ html, body {
 .player-info {
     min-width: 0;
     flex-shrink: 1;
-    max-width: 140px;
+    max-width: 120px;
 }
 
 .player-title {
@@ -383,20 +384,48 @@ html, body {
 }
 
 .player-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: var(--accent);
     border: none;
     flex-shrink: 0;
+    position: relative;
 }
 
 .player-btn:hover {
     background: var(--accent-hover);
 }
 
-.player-seek {
+.player-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.spinner-small {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.player-seek-area {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.player-times {
+    display: flex;
+    justify-content: space-between;
+}
+
+.player-seek {
     display: flex;
     align-items: center;
 }
@@ -404,30 +433,34 @@ html, body {
 .player-seek input[type="range"] {
     width: 100%;
     -webkit-appearance: none;
-    height: 3px;
+    height: 4px;
     background: var(--bg-active);
     border-radius: 2px;
     outline: none;
+    cursor: pointer;
 }
 
 .player-seek input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: var(--accent);
     cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.player-seek input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
 }
 
 .player-time {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-muted);
-    flex-shrink: 0;
-    min-width: 32px;
-    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
-/* Empty state */
+/* Empty & loading states */
 .empty-state {
     text-align: center;
     color: var(--text-muted);
@@ -435,7 +468,16 @@ html, body {
     font-size: 13px;
 }
 
-/* Loading spinner */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
 .spinner {
     width: 24px;
     height: 24px;
@@ -443,7 +485,6 @@ html, body {
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
-    margin: 20px auto;
 }
 
 @keyframes spin {
@@ -528,6 +569,7 @@ html, body {
 
 .playlist-track .result-actions {
     opacity: 0;
+    transition: opacity 0.15s;
 }
 
 .playlist-track:hover .result-actions {
@@ -718,6 +760,7 @@ select:focus, input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    pointer-events: none;
 }
 
 .toast {
@@ -729,6 +772,7 @@ select:focus, input[type="text"]:focus {
     border-left: 3px solid var(--accent);
     animation: toast-in 0.3s ease;
     max-width: 280px;
+    pointer-events: auto;
 }
 
 .toast.success {

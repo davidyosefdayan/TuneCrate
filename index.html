@@ -98,17 +98,25 @@
             <div id="player-artist" class="player-artist">-</div>
         </div>
         <button id="player-play-btn" class="btn-icon player-btn" title="Play/Pause">
-            <svg id="play-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5,3 19,12 5,21"/>
+            <svg id="play-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6,3 20,12 6,21"/>
             </svg>
-            <svg id="pause-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+            <svg id="pause-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none">
                 <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
             </svg>
+            <div id="loading-icon" class="player-loading" style="display:none">
+                <div class="spinner-small"></div>
+            </div>
         </button>
-        <div class="player-seek">
-            <input type="range" id="player-seek-bar" min="0" max="100" value="0">
+        <div class="player-seek-area">
+            <div class="player-times">
+                <span id="player-time" class="player-time">0:00</span>
+                <span id="player-duration" class="player-time">0:00</span>
+            </div>
+            <div class="player-seek">
+                <input type="range" id="player-seek-bar" min="0" max="100" value="0" step="0.1">
+            </div>
         </div>
-        <span id="player-time" class="player-time">0:00</span>
     </div>
 
     <!-- Toast container -->

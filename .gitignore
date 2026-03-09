@@ -2,3 +2,4 @@ node_modules/
 bin/yt-dlp
 bin/ffmpeg
 *.log
+*-player-script.js

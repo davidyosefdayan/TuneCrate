@@ -12,6 +12,7 @@ if (typeof globalThis.FormData === 'undefined') {
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
 
 const PLUGIN_ID = 'com.daviddayan.resolve.youtubemusic';
 
@@ -35,13 +36,6 @@ async function initResolveInterface() {
     return await WorkflowIntegration.GetResolve();
 }
 
-async function getResolve() {
-    if (!resolveObj && WorkflowIntegration) {
-        resolveObj = await initResolveInterface();
-    }
-    return resolveObj;
-}
-
 // --- Lib modules ---
 const YTMusicSearch = require('./lib/ytmusic-search');
 const AudioDownloader = require('./lib/audio-downloader');
@@ -55,17 +49,50 @@ const playlists = new PlaylistStore();
 const downloader = new AudioDownloader(settings);
 let resolveBridge = null;
 
-// --- Audio preview server ---
+// --- Audio preview via yt-dlp ---
+// Use yt-dlp to get a direct audio URL, then proxy it through a local server
 const http = require('http');
-const ytdl = require('@distube/ytdl-core');
-
 let previewServer = null;
-let currentPreviewStream = null;
+let audioUrlCache = new Map(); // videoId -> { url, expires }
+
+function getYtdlpPath() {
+    const bundled = path.join(__dirname, 'bin', 'yt-dlp');
+    if (fs.existsSync(bundled)) return bundled;
+    return 'yt-dlp';
+}
+
+function getAudioUrl(videoId) {
+    return new Promise((resolve, reject) => {
+        const cached = audioUrlCache.get(videoId);
+        if (cached && cached.expires > Date.now()) {
+            return resolve(cached.url);
+        }
+
+        const ytdlp = getYtdlpPath();
+        const args = [
+            '-f', 'bestaudio',
+            '--get-url',
+            '--no-playlist',
+            '--js-runtimes', 'node',
+            `https://www.youtube.com/watch?v=${videoId}`
+        ];
+
+        execFile(ytdlp, args, { timeout: 15000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error(stderr || err.message));
+            const url = stdout.trim();
+            if (!url) return reject(new Error('No URL returned'));
+            // Cache for 5 minutes (YouTube URLs expire)
+            audioUrlCache.set(videoId, { url, expires: Date.now() + 5 * 60 * 1000 });
+            resolve(url);
+        });
+    });
+}
 
 function startPreviewServer() {
     previewServer = http.createServer(async (req, res) => {
-        const url = new URL(req.url, 'http://localhost');
-        const videoId = url.searchParams.get('id');
+        const reqUrl = new URL(req.url, 'http://localhost');
+        const videoId = reqUrl.searchParams.get('id');
+
         if (!videoId) {
             res.writeHead(400);
             res.end('Missing id');
@@ -73,40 +100,45 @@ function startPreviewServer() {
         }
 
         try {
-            // Destroy previous stream if any
-            if (currentPreviewStream) {
-                currentPreviewStream.destroy();
-                currentPreviewStream = null;
-            }
+            const audioUrl = await getAudioUrl(videoId);
 
-            const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            const info = await ytdl.getInfo(videoUrl);
-            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' });
+            // Use native fetch/https to proxy the audio
+            const https = require('https');
+            const parsedUrl = new URL(audioUrl);
 
-            res.writeHead(200, {
-                'Content-Type': format.mimeType || 'audio/webm',
-                'Access-Control-Allow-Origin': '*',
-                'Transfer-Encoding': 'chunked'
-            });
-
-            currentPreviewStream = ytdl(videoUrl, { format });
-            currentPreviewStream.pipe(res);
-            currentPreviewStream.on('error', () => res.end());
-            res.on('close', () => {
-                if (currentPreviewStream) {
-                    currentPreviewStream.destroy();
-                    currentPreviewStream = null;
+            const proxyReq = https.request(parsedUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0',
+                    ...(req.headers.range ? { Range: req.headers.range } : {})
                 }
+            }, (proxyRes) => {
+                const headers = {
+                    'Content-Type': proxyRes.headers['content-type'] || 'audio/webm',
+                    'Access-Control-Allow-Origin': '*',
+                    'Accept-Ranges': 'bytes'
+                };
+                if (proxyRes.headers['content-length']) headers['Content-Length'] = proxyRes.headers['content-length'];
+                if (proxyRes.headers['content-range']) headers['Content-Range'] = proxyRes.headers['content-range'];
+
+                res.writeHead(proxyRes.statusCode, headers);
+                proxyRes.pipe(res);
             });
+
+            proxyReq.on('error', () => {
+                if (!res.headersSent) { res.writeHead(502); res.end('Proxy error'); }
+            });
+            req.on('close', () => proxyReq.destroy());
+            proxyReq.end();
         } catch (err) {
-            res.writeHead(500);
-            res.end('Stream error: ' + err.message);
+            if (!res.headersSent) {
+                res.writeHead(500);
+                res.end('Preview error: ' + err.message);
+            }
         }
     });
 
     previewServer.listen(0, '127.0.0.1', () => {
-        const port = previewServer.address().port;
-        console.log(`Preview server on port ${port}`);
+        console.log(`Preview server on port ${previewServer.address().port}`);
     });
 }
 
@@ -114,11 +146,22 @@ function getPreviewPort() {
     return previewServer ? previewServer.address().port : 0;
 }
 
+// --- IPC: get audio URL for preview (renderer fetches directly) ---
+async function handleGetPreviewUrl(event, videoId) {
+    try {
+        const port = getPreviewPort();
+        return { url: `http://127.0.0.1:${port}/stream?id=${videoId}`, error: null };
+    } catch (err) {
+        return { url: null, error: err.message };
+    }
+}
+
 // --- IPC Handlers ---
 function registerIpcHandlers() {
     // App
     ipcMain.handle('app:isResolveAvailable', () => resolveAvailable);
     ipcMain.handle('app:getPreviewPort', () => getPreviewPort());
+    ipcMain.handle('app:getPreviewUrl', handleGetPreviewUrl);
     ipcMain.handle('app:showInFinder', (event, filePath) => {
         shell.showItemInFolder(filePath);
     });
@@ -135,14 +178,13 @@ function registerIpcHandlers() {
     // Download
     ipcMain.handle('download:start', async (event, videoId, title, format) => {
         return await downloader.download(videoId, title, format, (progress) => {
-            mainWindow.webContents.send('download:progress', { videoId, progress });
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('download:progress', { videoId, progress });
+            }
         });
     });
     ipcMain.handle('download:cancel', (event, videoId) => {
         downloader.cancel(videoId);
-    });
-    ipcMain.handle('download:getPath', (event, videoId, title, format) => {
-        return downloader.getOutputPath(videoId, title, format);
     });
 
     // Playlists
@@ -203,19 +245,13 @@ function createWindow() {
     mainWindow.loadFile('index.html');
 
     mainWindow.on('close', () => {
-        if (currentPreviewStream) {
-            currentPreviewStream.destroy();
-        }
-        if (previewServer) {
-            previewServer.close();
-        }
+        if (previewServer) previewServer.close();
         app.quit();
     });
 }
 
 // --- App lifecycle ---
 app.whenReady().then(async () => {
-    // Try to connect to Resolve
     if (WorkflowIntegration) {
         try {
             resolveObj = await initResolveInterface();

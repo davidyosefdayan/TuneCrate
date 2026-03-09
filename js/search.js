@@ -8,7 +8,12 @@ async function performSearch() {
     if (!query) return;
 
     const container = document.getElementById('search-results');
-    container.innerHTML = '<div class="spinner"></div>';
+    container.innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Searching YouTube Music...</span>
+        </div>
+    `;
 
     try {
         searchResults = await window.musicAPI.search(query);
@@ -26,52 +31,70 @@ function renderSearchResults(results) {
         return;
     }
 
-    container.innerHTML = results.map(track => createResultItem(track)).join('');
+    container.innerHTML = '';
+    results.forEach(track => {
+        container.appendChild(createResultElement(track));
+    });
 }
 
-function createResultItem(track) {
+function createResultElement(track) {
     const isPlaying = AppState.currentTrack?.videoId === track.videoId;
-    const isDownloaded = AppState.downloadedPaths[track.videoId];
-    const progress = AppState.downloadProgress[track.videoId];
-    const isDownloading = progress !== undefined && progress < 100;
+    const isDownloaded = !!AppState.downloadedPaths[track.videoId];
+    const isDownloading = AppState.downloading.has(track.videoId);
+    const progress = AppState.downloadProgress[track.videoId] || 0;
 
-    return `
-        <div class="result-item ${isPlaying ? 'playing' : ''}" data-video-id="${track.videoId}">
-            <img class="result-thumb" src="${track.thumbnail}" alt="" loading="lazy"
-                 onerror="this.style.background='var(--bg-tertiary)'">
-            <div class="result-info" onclick="playTrack('${track.videoId}')">
-                <div class="result-title">${escapeHtml(track.title)}</div>
-                <div class="result-meta">${escapeHtml(track.artist)}${track.album ? ' \u2022 ' + escapeHtml(track.album) : ''}</div>
-            </div>
-            <span class="result-duration">${formatDuration(track.duration)}</span>
-            <div class="result-actions">
-                <select class="format-select" data-video-id="${track.videoId}" title="Format">
-                    <option value="mp3">MP3</option>
-                    <option value="wav">WAV</option>
-                </select>
-                ${isDownloading ? createProgressRing(progress) : `
-                    <button class="action-btn ${isDownloaded ? 'downloaded' : ''}"
-                            onclick="downloadTrack('${track.videoId}')"
-                            title="${isDownloaded ? 'Downloaded' : 'Download'}">
-                        ${isDownloaded ? checkIcon() : downloadIcon()}
-                    </button>
-                `}
-                <button class="action-btn" onclick="showAddToPlaylist('${track.videoId}')" title="Add to playlist">
-                    ${plusIcon()}
+    const el = document.createElement('div');
+    el.className = `result-item ${isPlaying ? 'playing' : ''}`;
+    el.dataset.videoId = track.videoId;
+
+    el.innerHTML = `
+        <img class="result-thumb" src="${track.thumbnail}" alt="" loading="lazy"
+             onerror="this.style.background='var(--bg-tertiary)'">
+        <div class="result-info">
+            <div class="result-title">${escapeHtml(track.title)}</div>
+            <div class="result-meta">${escapeHtml(track.artist)}${track.album ? ' \u00b7 ' + escapeHtml(track.album) : ''}</div>
+        </div>
+        <span class="result-duration">${formatDuration(track.duration)}</span>
+        <div class="result-actions">
+            <button class="action-btn play-btn" title="Preview">
+                ${isPlaying ? pauseSmallIcon() : playSmallIcon()}
+            </button>
+            <button class="action-btn download-btn ${isDownloaded ? 'done' : ''} ${isDownloading ? 'active' : ''}"
+                    title="${isDownloaded ? 'Downloaded' : isDownloading ? 'Downloading...' : 'Download'}"
+                    data-video-id="${track.videoId}">
+                ${isDownloaded ? checkIcon() : isDownloading ? spinnerIcon(progress) : downloadIcon()}
+            </button>
+            <button class="action-btn playlist-btn" title="Add to playlist">
+                ${plusIcon()}
+            </button>
+            ${AppState.resolveAvailable ? `
+                <button class="action-btn import-btn" title="Import to Resolve Media Pool">
+                    ${importIcon()}
                 </button>
-                ${AppState.resolveAvailable ? `
-                    <button class="action-btn" onclick="importTrack('${track.videoId}')" title="Import to Resolve">
-                        ${importIcon()}
-                    </button>
-                ` : ''}
-                ${isDownloaded ? `
-                    <button class="action-btn" onclick="showInFinder('${track.videoId}')" title="Show in Finder">
-                        ${folderIcon()}
-                    </button>
-                ` : ''}
-            </div>
+            ` : ''}
         </div>
     `;
+
+    // Download progress bar overlay
+    if (isDownloading) {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'result-progress';
+        progressBar.style.width = `${progress}%`;
+        el.appendChild(progressBar);
+        el.classList.add('downloading');
+    }
+
+    // Event listeners
+    el.querySelector('.result-info').addEventListener('click', () => playTrack(track.videoId));
+    el.querySelector('.result-thumb').addEventListener('click', () => playTrack(track.videoId));
+    el.querySelector('.play-btn').addEventListener('click', (e) => { e.stopPropagation(); playTrack(track.videoId); });
+    el.querySelector('.download-btn').addEventListener('click', (e) => { e.stopPropagation(); downloadTrack(track.videoId); });
+    el.querySelector('.playlist-btn').addEventListener('click', (e) => { e.stopPropagation(); showAddToPlaylist(track.videoId); });
+
+    const importBtn = el.querySelector('.import-btn');
+    if (importBtn) importBtn.addEventListener('click', (e) => { e.stopPropagation(); importTrack(track.videoId); });
+
+    return el;
 }
 
 function playTrack(videoId) {
@@ -80,21 +103,25 @@ function playTrack(videoId) {
 }
 
 async function downloadTrack(videoId) {
+    if (AppState.downloading.has(videoId) || AppState.downloadedPaths[videoId]) return;
+
     const track = findTrack(videoId);
     if (!track) return;
 
-    const formatEl = document.querySelector(`.format-select[data-video-id="${videoId}"]`);
-    const format = formatEl ? formatEl.value : 'mp3';
+    const format = await window.settingsAPI.get('defaultFormat') || 'mp3';
 
+    AppState.downloading.add(videoId);
     AppState.downloadProgress[videoId] = 0;
-    updateDownloadUI(videoId, 0);
+    updateDownloadButton(videoId, 0);
+    showToast(`Downloading: ${track.title}`);
 
     try {
         const filePath = await window.downloadAPI.start(videoId, track.title, format);
         AppState.downloadedPaths[videoId] = filePath;
+        AppState.downloading.delete(videoId);
         showToast(`Downloaded: ${track.title}`, 'success');
 
-        // Auto-import if setting enabled and Resolve available
+        // Auto-import if setting enabled
         if (AppState.resolveAvailable) {
             const autoImport = await window.settingsAPI.get('autoImport');
             if (autoImport) {
@@ -103,12 +130,56 @@ async function downloadTrack(videoId) {
             }
         }
 
-        renderSearchResults(searchResults);
+        refreshResultItem(videoId);
     } catch (err) {
+        AppState.downloading.delete(videoId);
         delete AppState.downloadProgress[videoId];
         showToast(`Download failed: ${err.message}`, 'error');
-        renderSearchResults(searchResults);
+        refreshResultItem(videoId);
     }
+}
+
+function updateDownloadButton(videoId, progress) {
+    const el = document.querySelector(`.result-item[data-video-id="${videoId}"]`);
+    if (!el) return;
+
+    // Update progress bar
+    let progressBar = el.querySelector('.result-progress');
+    if (!progressBar && progress < 100) {
+        progressBar = document.createElement('div');
+        progressBar.className = 'result-progress';
+        el.appendChild(progressBar);
+        el.classList.add('downloading');
+    }
+    if (progressBar) {
+        progressBar.style.width = `${progress}%`;
+    }
+
+    // Update button
+    const btn = el.querySelector('.download-btn');
+    if (btn) {
+        if (progress >= 100) {
+            btn.innerHTML = checkIcon();
+            btn.classList.add('done');
+            btn.classList.remove('active');
+            btn.title = 'Downloaded';
+            if (progressBar) progressBar.remove();
+            el.classList.remove('downloading');
+        } else {
+            btn.innerHTML = spinnerIcon(progress);
+            btn.classList.add('active');
+            btn.title = `Downloading ${Math.round(progress)}%`;
+        }
+    }
+}
+
+function refreshResultItem(videoId) {
+    const oldEl = document.querySelector(`.result-item[data-video-id="${videoId}"]`);
+    if (!oldEl) return;
+    const track = findTrack(videoId);
+    if (!track) return;
+    const newEl = createResultElement(track);
+    oldEl.replaceWith(newEl);
 }
 
 async function importTrack(videoId) {
@@ -125,20 +196,6 @@ async function importTrack(videoId) {
     }
 }
 
-function showInFinder(videoId) {
-    const filePath = AppState.downloadedPaths[videoId];
-    if (filePath) window.appAPI.showInFinder(filePath);
-}
-
-function updateDownloadUI(videoId, progress) {
-    const item = document.querySelector(`.result-item[data-video-id="${videoId}"]`);
-    if (!item) return;
-    // Re-render on completion
-    if (progress >= 100) {
-        renderSearchResults(searchResults);
-    }
-}
-
 function findTrack(videoId) {
     return searchResults.find(t => t.videoId === videoId);
 }
@@ -149,44 +206,29 @@ function showAddToPlaylist(videoId) {
     openPlaylistModal(track);
 }
 
-// HTML helpers
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+// SVG Icons
+function playSmallIcon() {
+    return '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>';
 }
-
+function pauseSmallIcon() {
+    return '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+}
 function downloadIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 }
-
 function checkIcon() {
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
 }
-
 function plusIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 }
-
 function importIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>';
 }
-
 function folderIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
 }
-
-function createProgressRing(progress) {
-    const r = 10;
-    const c = 2 * Math.PI * r;
-    const offset = c - (progress / 100) * c;
-    return `
-        <div class="download-progress">
-            <svg width="28" height="28" viewBox="0 0 28 28" class="progress-ring">
-                <circle cx="14" cy="14" r="${r}" fill="none" stroke-width="2" class="progress-ring-bg"/>
-                <circle cx="14" cy="14" r="${r}" fill="none" stroke-width="2" class="progress-ring-fill"
-                        stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
-            </svg>
-        </div>
-    `;
+function spinnerIcon(progress) {
+    const pct = Math.round(progress);
+    return `<svg viewBox="0 0 24 24" class="spin-icon"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--bg-active)" stroke-width="2"/><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="56.5" stroke-dashoffset="${56.5 - (pct / 100) * 56.5}" stroke-linecap="round" transform="rotate(-90 12 12)"/><text x="12" y="15" text-anchor="middle" fill="var(--text-primary)" font-size="7" font-weight="600">${pct}</text></svg>`;
 }

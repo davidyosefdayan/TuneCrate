@@ -7,7 +7,6 @@ contextBridge.exposeInMainWorld('musicAPI', {
 contextBridge.exposeInMainWorld('downloadAPI', {
     start: (videoId, title, format) => ipcRenderer.invoke('download:start', videoId, title, format),
     cancel: (videoId) => ipcRenderer.invoke('download:cancel', videoId),
-    getPath: (videoId, title, format) => ipcRenderer.invoke('download:getPath', videoId, title, format),
     onProgress: (callback) => ipcRenderer.on('download:progress', (event, data) => callback(data)),
 });
 
@@ -37,6 +36,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
 contextBridge.exposeInMainWorld('appAPI', {
     isResolveAvailable: () => ipcRenderer.invoke('app:isResolveAvailable'),
     getPreviewPort: () => ipcRenderer.invoke('app:getPreviewPort'),
+    getPreviewUrl: (videoId) => ipcRenderer.invoke('app:getPreviewUrl', videoId),
     showInFinder: (filePath) => ipcRenderer.invoke('app:showInFinder', filePath),
     openDownloadDir: () => ipcRenderer.invoke('app:openDownloadDir'),
 });

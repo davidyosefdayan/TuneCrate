@@ -3,8 +3,9 @@ const AppState = {
     resolveAvailable: false,
     previewPort: 0,
     currentTrack: null,
-    downloadProgress: {},
-    downloadedPaths: {}
+    downloadProgress: {},   // videoId -> percent
+    downloadedPaths: {},    // videoId -> filePath
+    downloading: new Set()  // videoIds currently downloading
 };
 
 // Tab navigation
@@ -39,6 +40,13 @@ function formatDuration(seconds) {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// HTML escape
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+}
+
 // Initialize
 async function initApp() {
     AppState.resolveAvailable = await window.appAPI.isResolveAvailable();
@@ -54,7 +62,10 @@ async function initApp() {
     // Listen for download progress
     window.downloadAPI.onProgress(({ videoId, progress }) => {
         AppState.downloadProgress[videoId] = progress;
-        updateDownloadUI(videoId, progress);
+        updateDownloadButton(videoId, progress);
+        if (progress >= 100) {
+            AppState.downloading.delete(videoId);
+        }
     });
 
     // Init sub-modules

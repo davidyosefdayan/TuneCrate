@@ -40,6 +40,13 @@ html, body {
     overflow: hidden;
     user-select: none;
     -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
 }
 
 /* ============================================
@@ -102,7 +109,8 @@ html, body {
    ============================================ */
 .tab-content {
     display: none;
-    height: calc(100vh - 38px - 40px);
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -188,7 +196,6 @@ html, body {
     overflow-y: auto;
     flex: 1;
     padding: 6px 10px;
-    padding-bottom: 70px; /* space for player bar */
 }
 
 .results-list::-webkit-scrollbar {
@@ -361,10 +368,6 @@ html, body {
    Player Bar — compact, flat
    ============================================ */
 .player-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
     height: 64px;
     background: var(--bg-primary);
     border-top: 1px solid var(--border);
@@ -373,7 +376,7 @@ html, body {
     grid-template-rows: 1fr auto;
     gap: 0 10px;
     padding: 8px 12px 6px;
-    z-index: 100;
+    flex-shrink: 0;
 }
 
 .player-bar.hidden {
@@ -561,7 +564,6 @@ html, body {
    ============================================ */
 #tab-library {
     padding: 12px;
-    padding-bottom: 70px;
 }
 
 .library-header {
@@ -663,7 +665,6 @@ html, body {
    ============================================ */
 #tab-settings {
     padding: 14px;
-    padding-bottom: 70px;
 }
 
 .settings-group {

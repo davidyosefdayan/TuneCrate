@@ -39,6 +39,7 @@ function renderSearchResults(results) {
 
 function createResultElement(track) {
     const isPlaying = AppState.currentTrack?.videoId === track.videoId;
+    const isLoading = isPlaying && isLoadingPreview;
     const isDownloaded = !!AppState.downloadedPaths[track.videoId];
     const isDownloading = AppState.downloading.has(track.videoId);
     const progress = AppState.downloadProgress[track.videoId] || 0;
@@ -46,6 +47,15 @@ function createResultElement(track) {
     const el = document.createElement('div');
     el.className = `result-item ${isPlaying ? 'playing' : ''}`;
     el.dataset.videoId = track.videoId;
+
+    let playBtnContent;
+    if (isLoading) {
+        playBtnContent = loadingSmallIcon();
+    } else if (isPlaying) {
+        playBtnContent = pauseSmallIcon();
+    } else {
+        playBtnContent = playSmallIcon();
+    }
 
     el.innerHTML = `
         <img class="result-thumb" src="${track.thumbnail}" alt="" loading="lazy"
@@ -56,8 +66,8 @@ function createResultElement(track) {
         </div>
         <span class="result-duration">${formatDuration(track.duration)}</span>
         <div class="result-actions">
-            <button class="action-btn play-btn" title="Preview">
-                ${isPlaying ? pauseSmallIcon() : playSmallIcon()}
+            <button class="action-btn play-btn ${isLoading ? 'loading' : ''}" title="Preview">
+                ${playBtnContent}
             </button>
             <button class="action-btn download-btn ${isDownloaded ? 'done' : ''} ${isDownloading ? 'active' : ''}"
                     title="${isDownloaded ? 'Downloaded' : isDownloading ? 'Downloading...' : 'Download'}"
@@ -197,7 +207,8 @@ async function importTrack(videoId) {
 }
 
 function findTrack(videoId) {
-    return searchResults.find(t => t.videoId === videoId);
+    return searchResults.find(t => t.videoId === videoId)
+        || (AppState.currentTrack?.videoId === videoId ? AppState.currentTrack : null);
 }
 
 function showAddToPlaylist(videoId) {
@@ -227,6 +238,9 @@ function importIcon() {
 }
 function folderIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+}
+function loadingSmallIcon() {
+    return '<svg viewBox="0 0 24 24" fill="none" class="spin-anim"><circle cx="12" cy="12" r="9" stroke="var(--bg-elevated)" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/></svg>';
 }
 function spinnerIcon(progress) {
     const pct = Math.round(progress);

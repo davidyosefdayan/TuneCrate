@@ -345,8 +345,21 @@ html, body {
     animation: none;
 }
 
+.spin-anim {
+    animation: spin 0.8s linear infinite;
+}
+
+.action-btn.loading {
+    cursor: default;
+}
+
+.action-btn.loading:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
 /* ============================================
-   Player Bar — compact, flat, no circle button
+   Player Bar — compact, flat
    ============================================ */
 .player-bar {
     position: fixed;
@@ -378,7 +391,7 @@ html, body {
     align-self: center;
 }
 
-/* Info + play button on row 1 */
+/* Info on row 1 */
 .player-info {
     min-width: 0;
     display: flex;
@@ -404,13 +417,23 @@ html, body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: none; /* hide artist to save space, title is enough */
+    display: none;
 }
 
-/* Play/pause button — small, square, flat */
+/* Action buttons group on row 1 */
+.player-actions {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+}
+
+/* Play/pause button — same size as other action-btns, just accent colored */
 .player-btn {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border-radius: 4px;
     background: var(--accent);
     border: none;
@@ -419,9 +442,8 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    grid-column: 3;
-    grid-row: 1;
-    align-self: center;
+    flex-shrink: 0;
+    color: white;
 }
 
 .player-btn:hover {
@@ -429,8 +451,8 @@ html, body {
 }
 
 .player-btn svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
 }
 
 .player-loading {
@@ -441,8 +463,8 @@ html, body {
 }
 
 .spinner-small {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-top-color: white;
     border-radius: 50%;

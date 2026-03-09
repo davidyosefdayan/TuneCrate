@@ -70,6 +70,10 @@ async function initApp() {
         if (progress >= 100) {
             AppState.downloading.delete(videoId);
         }
+        // Also update player bar download button if this is the current track
+        if (typeof updatePlayerActions === 'function') {
+            updatePlayerActions();
+        }
     });
 
     // Init sub-modules

@@ -107,17 +107,28 @@
             <div id="player-title" class="player-title">-</div>
             <div id="player-artist" class="player-artist">-</div>
         </div>
-        <button id="player-play-btn" class="player-btn" title="Play/Pause">
-            <svg id="play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="6,3 20,12 6,21"/>
-            </svg>
-            <svg id="pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-                <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-            </svg>
-            <div id="loading-icon" class="player-loading" style="display:none">
-                <div class="spinner-small"></div>
-            </div>
-        </button>
+        <div class="player-actions">
+            <button id="player-play-btn" class="player-btn" title="Play/Pause">
+                <svg id="play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="6,3 20,12 6,21"/>
+                </svg>
+                <svg id="pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                </svg>
+                <div id="loading-icon" class="player-loading" style="display:none">
+                    <div class="spinner-small"></div>
+                </div>
+            </button>
+            <button id="player-download-btn" class="action-btn" title="Download">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button id="player-playlist-btn" class="action-btn" title="Add to playlist">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button id="player-import-btn" class="action-btn resolve-only" title="Import to Resolve" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+            </button>
+        </div>
         <div class="player-seek-area">
             <div class="player-times">
                 <span id="player-time" class="player-time">0:00</span>

@@ -16,6 +16,18 @@ const playerDuration = document.getElementById('player-duration');
 
 document.getElementById('player-play-btn').addEventListener('click', togglePlayPause);
 
+document.getElementById('player-download-btn').addEventListener('click', () => {
+    if (AppState.currentTrack) downloadTrack(AppState.currentTrack.videoId);
+});
+
+document.getElementById('player-playlist-btn').addEventListener('click', () => {
+    if (AppState.currentTrack) showAddToPlaylist(AppState.currentTrack.videoId);
+});
+
+document.getElementById('player-import-btn').addEventListener('click', () => {
+    if (AppState.currentTrack) importTrack(AppState.currentTrack.videoId);
+});
+
 seekBar.addEventListener('input', () => {
     if (audio.duration && isFinite(audio.duration)) {
         audio.currentTime = (seekBar.value / 100) * audio.duration;
@@ -85,17 +97,15 @@ async function startPreview(track) {
     isLoadingPreview = true;
     isPlaying = false;
     updatePlayerIcons();
+    updatePlayerActions();
 
     // Highlight playing item
     document.querySelectorAll('.result-item').forEach(el => {
         el.classList.toggle('playing', el.dataset.videoId === track.videoId);
     });
 
-    // Update play buttons in results
-    document.querySelectorAll('.result-item .play-btn').forEach(btn => {
-        const item = btn.closest('.result-item');
-        btn.innerHTML = item.dataset.videoId === track.videoId ? pauseSmallIcon() : playSmallIcon();
-    });
+    // Update play buttons in results — show loading spinner for current track
+    updateListPlayButtons();
 
     // Get audio URL (may be cached from pre-fetch, or takes ~15s via yt-dlp)
     try {
@@ -141,4 +151,54 @@ function updatePlayerIcons() {
     playIcon.style.display = (isPlaying || isLoadingPreview) ? 'none' : 'block';
     pauseIcon.style.display = isPlaying ? 'block' : 'none';
     loadingIcon.style.display = isLoadingPreview ? 'block' : 'none';
+
+    // Sync list view play buttons
+    updateListPlayButtons();
+
+    // Sync player bar action buttons
+    updatePlayerActions();
+}
+
+function updateListPlayButtons() {
+    document.querySelectorAll('.result-item .play-btn').forEach(btn => {
+        const item = btn.closest('.result-item');
+        const isCurrent = item.dataset.videoId === AppState.currentTrack?.videoId;
+        if (isCurrent && isLoadingPreview) {
+            btn.innerHTML = loadingSmallIcon();
+            btn.classList.add('loading');
+        } else if (isCurrent && isPlaying) {
+            btn.innerHTML = pauseSmallIcon();
+            btn.classList.remove('loading');
+        } else {
+            btn.innerHTML = playSmallIcon();
+            btn.classList.remove('loading');
+        }
+    });
+}
+
+function updatePlayerActions() {
+    if (!AppState.currentTrack) return;
+    const videoId = AppState.currentTrack.videoId;
+    const isDownloaded = !!AppState.downloadedPaths[videoId];
+    const isDownloading = AppState.downloading.has(videoId);
+    const progress = AppState.downloadProgress[videoId] || 0;
+
+    const dlBtn = document.getElementById('player-download-btn');
+    if (dlBtn) {
+        if (isDownloaded) {
+            dlBtn.innerHTML = checkIcon();
+            dlBtn.classList.add('done');
+            dlBtn.classList.remove('active');
+            dlBtn.title = 'Downloaded';
+        } else if (isDownloading) {
+            dlBtn.innerHTML = spinnerIcon(progress);
+            dlBtn.classList.add('active');
+            dlBtn.classList.remove('done');
+            dlBtn.title = `Downloading ${Math.round(progress)}%`;
+        } else {
+            dlBtn.innerHTML = downloadIcon();
+            dlBtn.classList.remove('done', 'active');
+            dlBtn.title = 'Download';
+        }
+    }
 }

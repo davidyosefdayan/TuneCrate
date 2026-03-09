@@ -123,6 +123,7 @@ function renderHomeSections() {
 
     AppState.homeSections.forEach(section => {
         if (!section.items || section.items.length === 0) return;
+        if (/live\s+performance/i.test(section.title)) return;
 
         const sectionEl = document.createElement('div');
         sectionEl.className = 'home-section';

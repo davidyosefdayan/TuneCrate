@@ -2,6 +2,9 @@
 let searchResults = [];
 
 document.getElementById('search-btn').addEventListener('click', performSearch);
+document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') performSearch();
+});
 
 async function performSearch() {
     const query = document.getElementById('search-input').value.trim();

@@ -9,6 +9,7 @@ if (typeof globalThis.FormData === 'undefined') {
     globalThis.FormData = class FormData { constructor() { this._data = []; } append(k, v) { this._data.push([k, v]); } };
 }
 
+console.log('[BOOT] Starting...');
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -24,8 +25,9 @@ let resolveObj = null;
 let WorkflowIntegration = null;
 try {
     WorkflowIntegration = require('./WorkflowIntegration.node');
+    console.log('[BOOT] WorkflowIntegration loaded');
 } catch (e) {
-    // Running standalone — Resolve features disabled
+    console.log('[BOOT] WorkflowIntegration not available:', e.message);
 }
 
 // --- Resolve helpers (Studio mode only) ---
@@ -43,11 +45,13 @@ const ResolveBridge = require('./lib/resolve-bridge');
 const PlaylistStore = require('./lib/playlist-store');
 const SettingsStore = require('./lib/settings-store');
 
+console.log('[BOOT] Modules loaded');
 const ytmusic = new YTMusicSearch();
 const settings = new SettingsStore();
 const playlists = new PlaylistStore();
 const downloader = new AudioDownloader(settings);
 let resolveBridge = null;
+console.log('[BOOT] Instances created');
 
 // --- Audio preview via yt-dlp ---
 // Use yt-dlp to get a direct audio URL, then proxy it through a local server
@@ -243,6 +247,9 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
 
+    // Debug: open DevTools to see renderer errors
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+
     mainWindow.on('close', () => {
         if (previewServer) previewServer.close();
         app.quit();
@@ -257,22 +264,34 @@ if (!isInsideResolve) {
 }
 
 // --- App lifecycle ---
+console.log('[BOOT] Waiting for app ready...');
 app.whenReady().then(async () => {
-    if (WorkflowIntegration) {
+    console.log('[BOOT] App ready');
+    // Only try to connect to Resolve if we're running from the plugins directory
+    if (WorkflowIntegration && isInsideResolve) {
         try {
+            console.log('[BOOT] Connecting to Resolve...');
             resolveObj = await initResolveInterface();
             if (resolveObj) {
                 resolveAvailable = true;
                 resolveBridge = new ResolveBridge(resolveObj, WorkflowIntegration);
+                console.log('[BOOT] Connected to Resolve');
             }
         } catch (e) {
+            console.log('[BOOT] Resolve connection failed:', e.message);
             resolveAvailable = false;
         }
+    } else {
+        console.log('[BOOT] Standalone mode — skipping Resolve connection');
     }
 
+    console.log('[BOOT] Starting preview server...');
     startPreviewServer();
+    console.log('[BOOT] Registering IPC...');
     registerIpcHandlers();
+    console.log('[BOOT] Creating window...');
     createWindow();
+    console.log('[BOOT] Window created');
 });
 
 app.on('window-all-closed', () => {

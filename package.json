@@ -1,0 +1,17 @@
+{
+  "name": "youtube-music-resolve",
+  "version": "1.0.0",
+  "description": "YouTube Music plugin for DaVinci Resolve",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "install-plugin": "node scripts/install-plugin.js",
+    "download-binaries": "node scripts/download-binaries.js",
+    "postinstall": "node scripts/download-binaries.js"
+  },
+  "dependencies": {
+    "electron": "^28.0.0",
+    "ytmusic-api": "^5.0.0",
+    "@distube/ytdl-core": "^4.16.0"
+  }
+}

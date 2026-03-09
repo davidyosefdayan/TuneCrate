@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BlackmagicDesign>
+    <Plugin>
+        <Id>com.daviddayan.resolve.youtubemusic</Id>
+        <Name>YouTube Music</Name>
+        <Version>1.0</Version>
+        <Description>Search, preview, and download YouTube Music tracks for DaVinci Resolve</Description>
+        <FilePath>main.js</FilePath>
+    </Plugin>
+</BlackmagicDesign>

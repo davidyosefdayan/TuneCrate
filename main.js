@@ -42,6 +42,7 @@ const YTMusicSearch = require('./lib/ytmusic-search');
 const AudioDownloader = require('./lib/audio-downloader');
 const ResolveBridge = require('./lib/resolve-bridge');
 const PlaylistStore = require('./lib/playlist-store');
+const DownloadStore = require('./lib/download-store');
 const SettingsStore = require('./lib/settings-store');
 const { resolveYtdlpPath } = require('./lib/ytdlp-resolver');
 
@@ -49,6 +50,7 @@ console.log('[BOOT] Modules loaded');
 const ytmusic = new YTMusicSearch();
 const settings = new SettingsStore();
 const playlists = new PlaylistStore();
+const downloads = new DownloadStore();
 const downloader = new AudioDownloader(settings);
 let resolveBridge = null;
 console.log('[BOOT] Instances created');
@@ -187,8 +189,20 @@ function registerIpcHandlers() {
     // Music search
     ipcMain.handle('music:search', async (event, query) => {
         const results = await ytmusic.search(query);
-        // Pre-fetch audio URLs for all results in parallel
         const allIds = results.map(r => r.videoId);
+        prefetchUrls(allIds);
+        return results;
+    });
+
+    // Home sections
+    ipcMain.handle('music:getHomeSections', async () => {
+        return await ytmusic.getHomeSections();
+    });
+
+    // Get playlist tracks (for browsing playlists from home)
+    ipcMain.handle('music:getPlaylistTracks', async (event, playlistId) => {
+        const results = await ytmusic.getPlaylistTracks(playlistId);
+        const allIds = results.map(r => r.videoId).filter(Boolean);
         prefetchUrls(allIds);
         return results;
     });
@@ -210,6 +224,8 @@ function registerIpcHandlers() {
     ipcMain.handle('download:cancel', (event, videoId) => {
         downloader.cancel(videoId);
     });
+    ipcMain.handle('download:getHistory', () => downloads.getAll());
+    ipcMain.handle('download:saveToHistory', (event, track) => downloads.add(track));
 
     // Playlists
     ipcMain.handle('playlist:getAll', () => playlists.getAll());

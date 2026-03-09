@@ -4,7 +4,9 @@ const AppState = {
     currentTrack: null,
     downloadProgress: {},   // videoId -> percent
     downloadedPaths: {},    // videoId -> filePath
-    downloading: new Set()  // videoIds currently downloading
+    downloading: new Set(), // videoIds currently downloading
+    downloadHistory: [],    // loaded from main process
+    homeSections: []        // loaded from YouTube Music API
 };
 
 // Tab navigation
@@ -46,7 +48,184 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Initialize
+// Custom modal helpers (replace prompt/confirm)
+function showInputModal(title, defaultValue = '') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('input-modal');
+        const input = document.getElementById('input-modal-input');
+        const okBtn = document.getElementById('input-modal-ok');
+        const cancelBtn = document.getElementById('input-modal-cancel');
+
+        document.getElementById('input-modal-title').textContent = title;
+        input.value = defaultValue;
+        modal.classList.remove('hidden');
+        input.focus();
+        input.select();
+
+        function cleanup() {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            input.removeEventListener('keydown', onKey);
+        }
+        function onOk() { cleanup(); resolve(input.value); }
+        function onCancel() { cleanup(); resolve(null); }
+        function onKey(e) { if (e.key === 'Enter') onOk(); if (e.key === 'Escape') onCancel(); }
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        input.addEventListener('keydown', onKey);
+    });
+}
+
+function showConfirmModal(title, message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+        document.getElementById('confirm-modal-title').textContent = title;
+        document.getElementById('confirm-modal-message').textContent = message;
+        modal.classList.remove('hidden');
+
+        function cleanup() {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+        }
+        function onOk() { cleanup(); resolve(true); }
+        function onCancel() { cleanup(); resolve(false); }
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+    });
+}
+
+// ============================================
+// Home sections
+// ============================================
+async function loadHomeSections() {
+    const loading = document.getElementById('home-loading');
+    const container = document.getElementById('home-sections');
+
+    try {
+        AppState.homeSections = await window.musicAPI.getHomeSections();
+        loading.style.display = 'none';
+        renderHomeSections();
+    } catch (err) {
+        loading.innerHTML = '<div class="empty-state">Could not load home content</div>';
+    }
+}
+
+function renderHomeSections() {
+    const container = document.getElementById('home-sections');
+    container.innerHTML = '';
+
+    AppState.homeSections.forEach(section => {
+        if (!section.items || section.items.length === 0) return;
+
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'home-section';
+
+        const header = document.createElement('h4');
+        header.textContent = section.title;
+        sectionEl.appendChild(header);
+
+        const row = document.createElement('div');
+        row.className = 'home-row';
+
+        section.items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'home-card';
+
+            const thumb = document.createElement('img');
+            thumb.className = 'home-card-thumb';
+            thumb.src = item.thumbnailSmall || item.thumbnail;
+            thumb.alt = '';
+            thumb.loading = 'lazy';
+            thumb.onerror = function() { this.style.background = 'var(--bg-tertiary)'; };
+
+            const info = document.createElement('div');
+            info.className = 'home-card-info';
+
+            const name = document.createElement('div');
+            name.className = 'home-card-name';
+            name.textContent = item.name;
+
+            const artist = document.createElement('div');
+            artist.className = 'home-card-artist';
+            artist.textContent = item.artist;
+
+            info.appendChild(name);
+            info.appendChild(artist);
+            card.appendChild(thumb);
+            card.appendChild(info);
+
+            // Click behavior depends on type
+            card.addEventListener('click', () => onHomeItemClick(item));
+
+            row.appendChild(card);
+        });
+
+        sectionEl.appendChild(row);
+        container.appendChild(sectionEl);
+    });
+}
+
+async function onHomeItemClick(item) {
+    if (item.type === 'SONG' && item.videoId) {
+        // Play the song directly
+        startPreview({
+            videoId: item.videoId,
+            title: item.name,
+            artist: item.artist,
+            duration: item.duration || 0,
+            thumbnail: item.thumbnail
+        });
+    } else if (item.type === 'PLAYLIST' && item.playlistId) {
+        // Load playlist tracks and show as search results
+        showSearchView();
+        document.getElementById('search-input').value = item.name;
+
+        const container = document.getElementById('search-results');
+        container.innerHTML = `
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading playlist...</span>
+            </div>
+        `;
+
+        try {
+            searchResults = await window.musicAPI.getPlaylistTracks(item.playlistId);
+            renderSearchResults(sortResults(searchResults));
+        } catch (err) {
+            container.innerHTML = `<div class="empty-state">Could not load playlist</div>`;
+        }
+    } else if (item.type === 'ALBUM' && item.playlistId) {
+        // Albums also have a playlistId for their tracks
+        showSearchView();
+        document.getElementById('search-input').value = item.name + ' - ' + item.artist;
+
+        const container = document.getElementById('search-results');
+        container.innerHTML = `
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading album...</span>
+            </div>
+        `;
+
+        try {
+            searchResults = await window.musicAPI.getPlaylistTracks(item.playlistId);
+            renderSearchResults(sortResults(searchResults));
+        } catch (err) {
+            container.innerHTML = `<div class="empty-state">Could not load album</div>`;
+        }
+    }
+}
+
+// ============================================
+// Initialize (called from index.html after all scripts loaded)
+// ============================================
 async function initApp() {
     AppState.resolveAvailable = await window.appAPI.isResolveAvailable();
 
@@ -57,7 +236,7 @@ async function initApp() {
         document.getElementById('resolve-status').className = 'status-badge connected';
     }
 
-    // Listen for prefetch completions — update play buttons
+    // Listen for prefetch completions
     window.appAPI.onPrefetchReady((videoId) => {
         const btn = document.querySelector(`.result-item[data-video-id="${videoId}"] .play-btn`);
         if (btn) btn.classList.add('ready');
@@ -70,26 +249,30 @@ async function initApp() {
         if (progress >= 100) {
             AppState.downloading.delete(videoId);
         }
-        // Also update player bar download button if this is the current track
         if (typeof updatePlayerActions === 'function') {
             updatePlayerActions();
         }
     });
 
+    // Load download history
+    AppState.downloadHistory = await window.downloadAPI.getHistory();
+    AppState.downloadHistory.forEach(d => {
+        if (d.localPath) AppState.downloadedPaths[d.videoId] = d.localPath;
+    });
+
     // Init sub-modules
     initSettings();
     loadPlaylists();
+    loadDownloads();
+
+    // Load home content
+    loadHomeSections();
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && document.activeElement.id === 'search-input') {
-            performSearch();
-        }
-        if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+        if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
             e.preventDefault();
             togglePlayPause();
         }
     });
 }
-
-initApp();

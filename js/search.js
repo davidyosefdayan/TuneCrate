@@ -1,14 +1,66 @@
 // Search module
 let searchResults = [];
+let currentSort = 'relevance';
+let isSearchActive = false;
 
 document.getElementById('search-btn').addEventListener('click', performSearch);
 document.getElementById('search-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') performSearch();
 });
 
+// Clear search / back to home
+document.getElementById('search-clear-btn').addEventListener('click', clearSearch);
+
+// Sort select
+document.getElementById('search-sort').addEventListener('change', (e) => {
+    currentSort = e.target.value;
+    if (searchResults.length > 0) {
+        renderSearchResults(sortResults(searchResults));
+    }
+});
+
+function showSearchView() {
+    isSearchActive = true;
+    document.getElementById('home-view').classList.add('hidden');
+    document.getElementById('search-results').classList.remove('hidden');
+    document.getElementById('search-filters').classList.remove('hidden');
+    document.getElementById('search-clear-btn').classList.remove('hidden');
+}
+
+function showHomeView() {
+    isSearchActive = false;
+    document.getElementById('home-view').classList.remove('hidden');
+    document.getElementById('search-results').classList.add('hidden');
+    document.getElementById('search-filters').classList.add('hidden');
+    document.getElementById('search-clear-btn').classList.add('hidden');
+    document.getElementById('search-input').value = '';
+    searchResults = [];
+}
+
+function clearSearch() {
+    showHomeView();
+}
+
+function sortResults(results) {
+    const sorted = [...results];
+    switch (currentSort) {
+        case 'duration-asc':
+            sorted.sort((a, b) => (a.duration || 0) - (b.duration || 0));
+            break;
+        case 'duration-desc':
+            sorted.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+            break;
+        // 'relevance' — keep original API order
+    }
+    return sorted;
+}
+
 async function performSearch() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) return;
+
+    showSearchView();
+    addRecentSearch(query);
 
     const container = document.getElementById('search-results');
     container.innerHTML = `
@@ -20,7 +72,7 @@ async function performSearch() {
 
     try {
         searchResults = await window.musicAPI.search(query);
-        renderSearchResults(searchResults);
+        renderSearchResults(sortResults(searchResults));
     } catch (err) {
         container.innerHTML = `<div class="empty-state">Search failed: ${err.message}</div>`;
         showToast('Search failed', 'error');
@@ -132,6 +184,19 @@ async function downloadTrack(videoId) {
         const filePath = await window.downloadAPI.start(videoId, track.title, format);
         AppState.downloadedPaths[videoId] = filePath;
         AppState.downloading.delete(videoId);
+
+        // Save to download history
+        await window.downloadAPI.saveToHistory({
+            videoId: track.videoId,
+            title: track.title,
+            artist: track.artist,
+            duration: track.duration,
+            thumbnail: track.thumbnail,
+            localPath: filePath
+        });
+        AppState.downloadHistory = await window.downloadAPI.getHistory();
+        loadDownloads();
+
         showToast(`Downloaded: ${track.title}`, 'success');
 
         // Auto-import if setting enabled
@@ -211,6 +276,7 @@ async function importTrack(videoId) {
 
 function findTrack(videoId) {
     return searchResults.find(t => t.videoId === videoId)
+        || AppState.downloadHistory.find(t => t.videoId === videoId)
         || (AppState.currentTrack?.videoId === videoId ? AppState.currentTrack : null);
 }
 

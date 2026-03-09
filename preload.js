@@ -2,12 +2,16 @@ const { contextBridge, ipcRenderer } = require('electron/renderer');
 
 contextBridge.exposeInMainWorld('musicAPI', {
     search: (query) => ipcRenderer.invoke('music:search', query),
+    getHomeSections: () => ipcRenderer.invoke('music:getHomeSections'),
+    getPlaylistTracks: (playlistId) => ipcRenderer.invoke('music:getPlaylistTracks', playlistId),
 });
 
 contextBridge.exposeInMainWorld('downloadAPI', {
     start: (videoId, title, format) => ipcRenderer.invoke('download:start', videoId, title, format),
     cancel: (videoId) => ipcRenderer.invoke('download:cancel', videoId),
     onProgress: (callback) => ipcRenderer.on('download:progress', (event, data) => callback(data)),
+    getHistory: () => ipcRenderer.invoke('download:getHistory'),
+    saveToHistory: (track) => ipcRenderer.invoke('download:saveToHistory', track),
 });
 
 contextBridge.exposeInMainWorld('resolveAPI', {

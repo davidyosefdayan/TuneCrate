@@ -6,7 +6,7 @@ let isLoadingPreview = false;
 const playerBar = document.getElementById('player-bar');
 const playerThumb = document.getElementById('player-thumb');
 const playerTitle = document.getElementById('player-title');
-const playerArtist = document.getElementById('player-artist');
+const playerSubtitle = document.getElementById('player-subtitle');
 const playIcon = document.getElementById('play-icon');
 const pauseIcon = document.getElementById('pause-icon');
 const loadingIcon = document.getElementById('loading-icon');
@@ -28,16 +28,23 @@ document.getElementById('player-import-btn').addEventListener('click', () => {
     if (AppState.currentTrack) importTrack(AppState.currentTrack.videoId);
 });
 
+function updateSeekBarFill() {
+    const pct = seekBar.value;
+    seekBar.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--bg-elevated) ${pct}%)`;
+}
+
 seekBar.addEventListener('input', () => {
     if (audio.duration && isFinite(audio.duration)) {
         audio.currentTime = (seekBar.value / 100) * audio.duration;
     }
+    updateSeekBarFill();
 });
 
 audio.addEventListener('timeupdate', () => {
     if (audio.duration && isFinite(audio.duration)) {
         seekBar.value = (audio.currentTime / audio.duration) * 100;
         playerTime.textContent = formatDuration(audio.currentTime);
+        updateSeekBarFill();
     }
 });
 
@@ -89,7 +96,7 @@ async function startPreview(track) {
     playerBar.classList.remove('hidden');
     playerThumb.src = track.thumbnail;
     playerTitle.textContent = track.title;
-    playerArtist.textContent = track.artist;
+    playerSubtitle.textContent = track.album ? `${track.artist} · ${track.album}` : track.artist;
     seekBar.value = 0;
     playerTime.textContent = '0:00';
     playerDuration.textContent = formatDuration(track.duration);

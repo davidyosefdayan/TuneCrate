@@ -184,7 +184,7 @@ html, body {
 .results-list {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 4px;
     overflow-y: auto;
     flex: 1;
     padding: 6px 10px;
@@ -226,7 +226,6 @@ html, body {
 
 .result-item.playing {
     background: var(--bg-tertiary);
-    border-left: 3px solid var(--accent);
 }
 
 .result-item.downloading {

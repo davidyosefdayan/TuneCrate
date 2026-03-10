@@ -243,6 +243,26 @@ function registerIpcHandlers() {
         return await ytmusic.getHomeSections();
     });
 
+    // Artist
+    ipcMain.handle('music:getArtist', async (event, artistId) => {
+        return await ytmusic.getArtist(artistId);
+    });
+
+    ipcMain.handle('music:getArtistSongs', async (event, artistId) => {
+        const results = await ytmusic.getArtistSongs(artistId);
+        const allIds = results.map(r => r.videoId).filter(Boolean);
+        audioSources.prefetchUrls(allIds);
+        return results;
+    });
+
+    // Album
+    ipcMain.handle('music:getAlbum', async (event, albumId) => {
+        const album = await ytmusic.getAlbum(albumId);
+        const allIds = album.songs.map(s => s.videoId).filter(Boolean);
+        audioSources.prefetchUrls(allIds);
+        return album;
+    });
+
 
     // Check if a preview URL is cached (for UI status)
     ipcMain.handle('app:isPreviewCached', (event, videoId) => {

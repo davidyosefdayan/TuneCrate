@@ -75,6 +75,42 @@
             </div>
             <div id="playlist-detail-tracks" class="results-list"></div>
         </div>
+
+        <!-- Artist detail view -->
+        <div id="artist-detail" class="detail-view hidden">
+            <div class="detail-view-header">
+                <button id="artist-detail-back" class="btn-icon detail-back-btn" title="Back">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+                <img id="artist-detail-thumb" class="detail-view-thumb artist-thumb" src="" alt="">
+                <div class="detail-view-info">
+                    <div class="detail-view-label">Artist</div>
+                    <div id="artist-detail-name" class="detail-view-title"></div>
+                </div>
+            </div>
+            <div id="artist-detail-content" class="detail-view-content"></div>
+        </div>
+
+        <!-- Album detail view -->
+        <div id="album-detail" class="detail-view hidden">
+            <div class="detail-view-header">
+                <button id="album-detail-back" class="btn-icon detail-back-btn" title="Back">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+                <img id="album-detail-thumb" class="detail-view-thumb" src="" alt="">
+                <div class="detail-view-info">
+                    <div class="detail-view-label">Album</div>
+                    <div id="album-detail-name" class="detail-view-title"></div>
+                    <div id="album-detail-artist" class="detail-view-subtitle clickable-artist"></div>
+                    <div id="album-detail-year" class="detail-view-meta"></div>
+                </div>
+            </div>
+            <div id="album-detail-tracks" class="results-list"></div>
+        </div>
     </div>
 
     <!-- Library tab -->

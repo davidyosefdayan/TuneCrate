@@ -4,6 +4,9 @@ contextBridge.exposeInMainWorld('musicAPI', {
     search: (query) => ipcRenderer.invoke('music:search', query),
     getHomeSections: () => ipcRenderer.invoke('music:getHomeSections'),
     getPlaylistTracks: (playlistId) => ipcRenderer.invoke('music:getPlaylistTracks', playlistId),
+    getArtist: (artistId) => ipcRenderer.invoke('music:getArtist', artistId),
+    getArtistSongs: (artistId) => ipcRenderer.invoke('music:getArtistSongs', artistId),
+    getAlbum: (albumId) => ipcRenderer.invoke('music:getAlbum', albumId),
 });
 
 contextBridge.exposeInMainWorld('downloadAPI', {

@@ -19,10 +19,22 @@ document.getElementById('search-sort').addEventListener('change', (e) => {
     }
 });
 
+// Navigation stack for back button
+let viewHistory = [];
+
+function hideAllViews() {
+    document.getElementById('home-view').classList.add('hidden');
+    document.getElementById('search-results').classList.add('hidden');
+    document.getElementById('search-filters').classList.add('hidden');
+    document.getElementById('search-clear-btn').classList.add('hidden');
+    document.getElementById('playlist-detail').classList.add('hidden');
+    document.getElementById('artist-detail').classList.add('hidden');
+    document.getElementById('album-detail').classList.add('hidden');
+}
+
 function showSearchView() {
     isSearchActive = true;
-    document.getElementById('home-view').classList.add('hidden');
-    document.getElementById('playlist-detail').classList.add('hidden');
+    hideAllViews();
     document.getElementById('search-results').classList.remove('hidden');
     document.getElementById('search-filters').classList.remove('hidden');
     document.getElementById('search-clear-btn').classList.remove('hidden');
@@ -31,22 +43,17 @@ function showSearchView() {
 
 function showHomeView() {
     isSearchActive = false;
+    viewHistory = [];
+    hideAllViews();
     document.getElementById('home-view').classList.remove('hidden');
-    document.getElementById('search-results').classList.add('hidden');
-    document.getElementById('search-filters').classList.add('hidden');
-    document.getElementById('search-clear-btn').classList.add('hidden');
-    document.getElementById('playlist-detail').classList.add('hidden');
     document.querySelector('.search-bar').classList.remove('hidden');
     document.getElementById('search-input').value = '';
     searchResults = [];
 }
 
 function showPlaylistDetailView(item) {
-    document.getElementById('home-view').classList.add('hidden');
-    document.getElementById('search-results').classList.add('hidden');
-    document.getElementById('search-filters').classList.add('hidden');
+    hideAllViews();
     document.querySelector('.search-bar').classList.add('hidden');
-    document.getElementById('search-clear-btn').classList.add('hidden');
 
     const detail = document.getElementById('playlist-detail');
     detail.classList.remove('hidden');
@@ -62,6 +69,267 @@ function showPlaylistDetailView(item) {
             <span>Loading tracks...</span>
         </div>
     `;
+}
+
+function navigateBack() {
+    if (viewHistory.length > 0) {
+        const prev = viewHistory.pop();
+        prev();
+    } else {
+        showHomeView();
+    }
+}
+
+async function showArtistView(artistId, artistName) {
+    if (!artistId) return;
+
+    // Push current view to history
+    const currentView = captureCurrentView();
+    if (currentView) viewHistory.push(currentView);
+
+    hideAllViews();
+    document.querySelector('.search-bar').classList.add('hidden');
+
+    const detail = document.getElementById('artist-detail');
+    detail.classList.remove('hidden');
+
+    document.getElementById('artist-detail-name').textContent = artistName || '';
+    document.getElementById('artist-detail-thumb').src = '';
+    document.getElementById('artist-detail-content').innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading artist...</span>
+        </div>
+    `;
+
+    try {
+        const artist = await window.musicAPI.getArtist(artistId);
+
+        document.getElementById('artist-detail-name').textContent = artist.name;
+        if (artist.thumbnail) {
+            document.getElementById('artist-detail-thumb').src = artist.thumbnail;
+        }
+
+        const content = document.getElementById('artist-detail-content');
+        content.innerHTML = '';
+
+        // Top songs
+        if (artist.topSongs && artist.topSongs.length > 0) {
+            const songsSection = document.createElement('div');
+            songsSection.className = 'detail-section';
+            songsSection.innerHTML = '<div class="detail-section-title">Top Songs</div>';
+
+            const songsList = document.createElement('div');
+            songsList.className = 'detail-songs-list';
+            artist.topSongs.forEach(track => {
+                songsList.appendChild(createResultElement(track));
+            });
+            songsSection.appendChild(songsList);
+            content.appendChild(songsSection);
+
+            searchResults = artist.topSongs;
+        }
+
+        // Albums
+        if (artist.topAlbums && artist.topAlbums.length > 0) {
+            const albumsSection = document.createElement('div');
+            albumsSection.className = 'detail-section';
+            albumsSection.innerHTML = '<div class="detail-section-title">Albums</div>';
+
+            const albumsRow = document.createElement('div');
+            albumsRow.className = 'detail-albums-row';
+            artist.topAlbums.forEach(album => {
+                const card = createAlbumCard(album);
+                albumsRow.appendChild(card);
+            });
+            albumsSection.appendChild(albumsRow);
+            content.appendChild(albumsSection);
+        }
+
+        // Singles
+        if (artist.topSingles && artist.topSingles.length > 0) {
+            const singlesSection = document.createElement('div');
+            singlesSection.className = 'detail-section';
+            singlesSection.innerHTML = '<div class="detail-section-title">Singles</div>';
+
+            const singlesRow = document.createElement('div');
+            singlesRow.className = 'detail-albums-row';
+            artist.topSingles.forEach(single => {
+                const card = createAlbumCard(single);
+                singlesRow.appendChild(card);
+            });
+            singlesSection.appendChild(singlesRow);
+            content.appendChild(singlesSection);
+        }
+
+        // "Show all songs" button
+        const allSection = document.createElement('div');
+        allSection.className = 'detail-section';
+        allSection.style.padding = '4px 12px 16px';
+        const allBtn = document.createElement('button');
+        allBtn.className = 'btn-small';
+        allBtn.textContent = 'Show All Songs';
+        allBtn.addEventListener('click', () => loadAllArtistSongs(artistId));
+        allSection.appendChild(allBtn);
+        content.appendChild(allSection);
+
+    } catch (err) {
+        document.getElementById('artist-detail-content').innerHTML =
+            '<div class="empty-state">Could not load artist</div>';
+    }
+}
+
+async function loadAllArtistSongs(artistId) {
+    const content = document.getElementById('artist-detail-content');
+    // Replace top songs with all songs
+    content.innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading all songs...</span>
+        </div>
+    `;
+
+    try {
+        const songs = await window.musicAPI.getArtistSongs(artistId);
+        searchResults = songs;
+
+        content.innerHTML = '';
+        const section = document.createElement('div');
+        section.className = 'detail-section';
+        section.innerHTML = `<div class="detail-section-title">All Songs (${songs.length})</div>`;
+
+        const songsList = document.createElement('div');
+        songsList.className = 'detail-songs-list';
+        songs.forEach(track => {
+            songsList.appendChild(createResultElement(track));
+        });
+        section.appendChild(songsList);
+        content.appendChild(section);
+    } catch (err) {
+        content.innerHTML = '<div class="empty-state">Could not load songs</div>';
+    }
+}
+
+async function showAlbumView(albumId, albumName) {
+    if (!albumId) return;
+
+    const currentView = captureCurrentView();
+    if (currentView) viewHistory.push(currentView);
+
+    hideAllViews();
+    document.querySelector('.search-bar').classList.add('hidden');
+
+    const detail = document.getElementById('album-detail');
+    detail.classList.remove('hidden');
+
+    document.getElementById('album-detail-name').textContent = albumName || '';
+    document.getElementById('album-detail-artist').textContent = '';
+    document.getElementById('album-detail-year').textContent = '';
+    document.getElementById('album-detail-thumb').src = '';
+    document.getElementById('album-detail-tracks').innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading album...</span>
+        </div>
+    `;
+
+    try {
+        const album = await window.musicAPI.getAlbum(albumId);
+
+        document.getElementById('album-detail-name').textContent = album.name;
+        document.getElementById('album-detail-artist').textContent = album.artist;
+        document.getElementById('album-detail-artist').dataset.artistId = album.artistId || '';
+        document.getElementById('album-detail-year').textContent = album.year ? String(album.year) : '';
+        if (album.thumbnail) {
+            document.getElementById('album-detail-thumb').src = album.thumbnail;
+        }
+
+        searchResults = album.songs;
+
+        const container = document.getElementById('album-detail-tracks');
+        container.innerHTML = '';
+        if (!album.songs || album.songs.length === 0) {
+            container.innerHTML = '<div class="empty-state">No tracks found</div>';
+            return;
+        }
+        album.songs.forEach(track => {
+            container.appendChild(createResultElement(track));
+        });
+    } catch (err) {
+        document.getElementById('album-detail-tracks').innerHTML =
+            '<div class="empty-state">Could not load album</div>';
+    }
+}
+
+function createAlbumCard(album) {
+    const card = document.createElement('div');
+    card.className = 'detail-album-card';
+
+    const img = document.createElement('img');
+    img.src = album.thumbnail || '';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.onerror = function() { this.style.background = 'var(--bg-tertiary)'; };
+
+    const info = document.createElement('div');
+    info.className = 'detail-album-card-info';
+
+    const name = document.createElement('div');
+    name.className = 'detail-album-card-name';
+    name.textContent = album.name;
+
+    const year = document.createElement('div');
+    year.className = 'detail-album-card-year';
+    year.textContent = album.year || '';
+
+    info.appendChild(name);
+    info.appendChild(year);
+    card.appendChild(img);
+    card.appendChild(info);
+
+    card.addEventListener('click', () => showAlbumView(album.albumId, album.name));
+
+    return card;
+}
+
+function captureCurrentView() {
+    if (!document.getElementById('artist-detail').classList.contains('hidden')) {
+        // We're on artist view — save a restore function
+        const name = document.getElementById('artist-detail-name').textContent;
+        const content = document.getElementById('artist-detail-content').innerHTML;
+        const thumb = document.getElementById('artist-detail-thumb').src;
+        return () => {
+            hideAllViews();
+            document.querySelector('.search-bar').classList.add('hidden');
+            document.getElementById('artist-detail').classList.remove('hidden');
+            document.getElementById('artist-detail-name').textContent = name;
+            document.getElementById('artist-detail-content').innerHTML = content;
+            document.getElementById('artist-detail-thumb').src = thumb;
+        };
+    }
+    if (!document.getElementById('album-detail').classList.contains('hidden')) {
+        const name = document.getElementById('album-detail-name').textContent;
+        const content = document.getElementById('album-detail-tracks').innerHTML;
+        const thumb = document.getElementById('album-detail-thumb').src;
+        const artist = document.getElementById('album-detail-artist').textContent;
+        const artistId = document.getElementById('album-detail-artist').dataset.artistId;
+        const year = document.getElementById('album-detail-year').textContent;
+        return () => {
+            hideAllViews();
+            document.querySelector('.search-bar').classList.add('hidden');
+            document.getElementById('album-detail').classList.remove('hidden');
+            document.getElementById('album-detail-name').textContent = name;
+            document.getElementById('album-detail-tracks').innerHTML = content;
+            document.getElementById('album-detail-thumb').src = thumb;
+            document.getElementById('album-detail-artist').textContent = artist;
+            document.getElementById('album-detail-artist').dataset.artistId = artistId;
+            document.getElementById('album-detail-year').textContent = year;
+        };
+    }
+    if (isSearchActive) {
+        return () => showSearchView();
+    }
+    return () => showHomeView();
 }
 
 function renderPlaylistDetailTracks(tracks) {
@@ -84,8 +352,17 @@ function clearSearch() {
     showHomeView();
 }
 
-// Back button from playlist detail
+// Back buttons
 document.getElementById('playlist-detail-back').addEventListener('click', showHomeView);
+document.getElementById('artist-detail-back').addEventListener('click', navigateBack);
+document.getElementById('album-detail-back').addEventListener('click', navigateBack);
+
+// Album detail — clickable artist name
+document.getElementById('album-detail-artist').addEventListener('click', () => {
+    const artistId = document.getElementById('album-detail-artist').dataset.artistId;
+    const artistName = document.getElementById('album-detail-artist').textContent;
+    if (artistId) showArtistView(artistId, artistName);
+});
 
 function sortResults(results) {
     const sorted = [...results];
@@ -165,7 +442,7 @@ function createResultElement(track) {
              onerror="this.style.background='var(--bg-tertiary)'">
         <div class="result-info">
             <div class="result-title">${escapeHtml(track.title)}</div>
-            <div class="result-meta">${escapeHtml(track.artist)}${track.album ? ' \u00b7 ' + escapeHtml(track.album) : ''}</div>
+            <div class="result-meta">${track.artistId ? `<span class="meta-link" data-artist-id="${escapeHtml(track.artistId)}">${escapeHtml(track.artist)}</span>` : escapeHtml(track.artist)}${track.album ? ' \u00b7 ' + (track.albumId ? `<span class="meta-link" data-album-id="${escapeHtml(track.albumId)}">${escapeHtml(track.album)}</span>` : escapeHtml(track.album)) : ''}</div>
         </div>
         <span class="result-duration">${formatDuration(track.duration)}</span>
         <div class="result-actions">
@@ -197,8 +474,28 @@ function createResultElement(track) {
         el.classList.add('downloading');
     }
 
+    // Meta link clicks (artist / album)
+    const artistLink = el.querySelector('.meta-link[data-artist-id]');
+    if (artistLink) {
+        artistLink.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showArtistView(artistLink.dataset.artistId, track.artist);
+        });
+    }
+    const albumLink = el.querySelector('.meta-link[data-album-id]');
+    if (albumLink) {
+        albumLink.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showAlbumView(albumLink.dataset.albumId, track.album);
+        });
+    }
+
     // Event listeners
-    el.querySelector('.result-info').addEventListener('click', () => playTrack(track.videoId));
+    el.querySelector('.result-info').addEventListener('click', (e) => {
+        // Don't play if clicking a meta link
+        if (e.target.classList.contains('meta-link')) return;
+        playTrack(track.videoId);
+    });
     el.querySelector('.result-thumb').addEventListener('click', () => playTrack(track.videoId));
     el.querySelector('.play-btn').addEventListener('click', (e) => { e.stopPropagation(); playTrack(track.videoId); });
     el.querySelector('.download-btn').addEventListener('click', async (e) => {

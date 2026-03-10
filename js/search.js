@@ -110,73 +110,78 @@ async function showArtistView(artistId, artistName) {
             document.getElementById('artist-detail-thumb').src = artist.thumbnail;
         }
 
-        const content = document.getElementById('artist-detail-content');
-        content.innerHTML = '';
-
-        // Top songs
-        if (artist.topSongs && artist.topSongs.length > 0) {
-            const songsSection = document.createElement('div');
-            songsSection.className = 'detail-section';
-            songsSection.innerHTML = '<div class="detail-section-title">Top Songs</div>';
-
-            const songsList = document.createElement('div');
-            songsList.className = 'detail-songs-list';
-            artist.topSongs.forEach(track => {
-                songsList.appendChild(createResultElement(track));
-            });
-            songsSection.appendChild(songsList);
-            content.appendChild(songsSection);
-
-            searchResults = artist.topSongs;
-        }
-
-        // Albums
-        if (artist.topAlbums && artist.topAlbums.length > 0) {
-            const albumsSection = document.createElement('div');
-            albumsSection.className = 'detail-section';
-            albumsSection.innerHTML = '<div class="detail-section-title">Albums</div>';
-
-            const albumsRow = document.createElement('div');
-            albumsRow.className = 'detail-albums-row';
-            artist.topAlbums.forEach(album => {
-                const card = createAlbumCard(album);
-                albumsRow.appendChild(card);
-            });
-            albumsSection.appendChild(albumsRow);
-            content.appendChild(albumsSection);
-        }
-
-        // Singles
-        if (artist.topSingles && artist.topSingles.length > 0) {
-            const singlesSection = document.createElement('div');
-            singlesSection.className = 'detail-section';
-            singlesSection.innerHTML = '<div class="detail-section-title">Singles</div>';
-
-            const singlesRow = document.createElement('div');
-            singlesRow.className = 'detail-albums-row';
-            artist.topSingles.forEach(single => {
-                const card = createAlbumCard(single);
-                singlesRow.appendChild(card);
-            });
-            singlesSection.appendChild(singlesRow);
-            content.appendChild(singlesSection);
-        }
-
-        // "Show all songs" button
-        const allSection = document.createElement('div');
-        allSection.className = 'detail-section';
-        allSection.style.padding = '4px 12px 16px';
-        const allBtn = document.createElement('button');
-        allBtn.className = 'btn-small';
-        allBtn.textContent = 'Show All Songs';
-        allBtn.addEventListener('click', () => loadAllArtistSongs(artistId));
-        allSection.appendChild(allBtn);
-        content.appendChild(allSection);
+        lastArtistData = artist;
+        renderArtistContent(artist);
 
     } catch (err) {
         document.getElementById('artist-detail-content').innerHTML =
             '<div class="empty-state">Could not load artist</div>';
     }
+}
+
+function renderArtistContent(artist) {
+    const content = document.getElementById('artist-detail-content');
+    content.innerHTML = '';
+
+    // Top songs
+    if (artist.topSongs && artist.topSongs.length > 0) {
+        const songsSection = document.createElement('div');
+        songsSection.className = 'detail-section';
+        songsSection.innerHTML = '<div class="detail-section-title">Top Songs</div>';
+
+        const songsList = document.createElement('div');
+        songsList.className = 'detail-songs-list';
+        artist.topSongs.forEach(track => {
+            songsList.appendChild(createResultElement(track));
+        });
+        songsSection.appendChild(songsList);
+        content.appendChild(songsSection);
+
+        searchResults = artist.topSongs;
+    }
+
+    // Albums
+    if (artist.topAlbums && artist.topAlbums.length > 0) {
+        const albumsSection = document.createElement('div');
+        albumsSection.className = 'detail-section';
+        albumsSection.innerHTML = '<div class="detail-section-title">Albums</div>';
+
+        const albumsRow = document.createElement('div');
+        albumsRow.className = 'detail-albums-row';
+        artist.topAlbums.forEach(album => {
+            const card = createAlbumCard(album);
+            albumsRow.appendChild(card);
+        });
+        albumsSection.appendChild(albumsRow);
+        content.appendChild(albumsSection);
+    }
+
+    // Singles
+    if (artist.topSingles && artist.topSingles.length > 0) {
+        const singlesSection = document.createElement('div');
+        singlesSection.className = 'detail-section';
+        singlesSection.innerHTML = '<div class="detail-section-title">Singles</div>';
+
+        const singlesRow = document.createElement('div');
+        singlesRow.className = 'detail-albums-row';
+        artist.topSingles.forEach(single => {
+            const card = createAlbumCard(single);
+            singlesRow.appendChild(card);
+        });
+        singlesSection.appendChild(singlesRow);
+        content.appendChild(singlesSection);
+    }
+
+    // "Show all songs" button
+    const allSection = document.createElement('div');
+    allSection.className = 'detail-section';
+    allSection.style.padding = '4px 12px 16px';
+    const allBtn = document.createElement('button');
+    allBtn.className = 'btn-small';
+    allBtn.textContent = 'Show All Songs';
+    allBtn.addEventListener('click', () => loadAllArtistSongs(artist.artistId));
+    allSection.appendChild(allBtn);
+    content.appendChild(allSection);
 }
 
 async function loadAllArtistSongs(artistId) {
@@ -292,44 +297,64 @@ function createAlbumCard(album) {
     return card;
 }
 
+// Store the last fetched artist data so we can restore without re-fetching
+let lastArtistData = null;
+
 function captureCurrentView() {
     if (!document.getElementById('artist-detail').classList.contains('hidden')) {
-        // We're on artist view — save a restore function
-        const name = document.getElementById('artist-detail-name').textContent;
-        const content = document.getElementById('artist-detail-content').innerHTML;
-        const thumb = document.getElementById('artist-detail-thumb').src;
-        return () => {
-            hideAllViews();
-            document.querySelector('.search-bar').classList.add('hidden');
-            document.getElementById('artist-detail').classList.remove('hidden');
-            document.getElementById('artist-detail-name').textContent = name;
-            document.getElementById('artist-detail-content').innerHTML = content;
-            document.getElementById('artist-detail-thumb').src = thumb;
-        };
+        // Save artist data to re-render with live event listeners on restore
+        const savedArtist = lastArtistData;
+        if (savedArtist) {
+            return () => restoreArtistView(savedArtist);
+        }
+        // Fallback: just re-fetch
+        const artistName = document.getElementById('artist-detail-name').textContent;
+        const artistId = lastArtistData?.artistId;
+        if (artistId) {
+            return () => showArtistView(artistId, artistName);
+        }
+        return () => showHomeView();
     }
     if (!document.getElementById('album-detail').classList.contains('hidden')) {
         const name = document.getElementById('album-detail-name').textContent;
-        const content = document.getElementById('album-detail-tracks').innerHTML;
         const thumb = document.getElementById('album-detail-thumb').src;
         const artist = document.getElementById('album-detail-artist').textContent;
         const artistId = document.getElementById('album-detail-artist').dataset.artistId;
         const year = document.getElementById('album-detail-year').textContent;
+        const savedTracks = [...searchResults];
         return () => {
             hideAllViews();
             document.querySelector('.search-bar').classList.add('hidden');
             document.getElementById('album-detail').classList.remove('hidden');
             document.getElementById('album-detail-name').textContent = name;
-            document.getElementById('album-detail-tracks').innerHTML = content;
             document.getElementById('album-detail-thumb').src = thumb;
             document.getElementById('album-detail-artist').textContent = artist;
             document.getElementById('album-detail-artist').dataset.artistId = artistId;
             document.getElementById('album-detail-year').textContent = year;
+            searchResults = savedTracks;
+            const container = document.getElementById('album-detail-tracks');
+            container.innerHTML = '';
+            savedTracks.forEach(track => container.appendChild(createResultElement(track)));
         };
     }
     if (isSearchActive) {
         return () => showSearchView();
     }
     return () => showHomeView();
+}
+
+function restoreArtistView(artist) {
+    hideAllViews();
+    document.querySelector('.search-bar').classList.add('hidden');
+
+    const detail = document.getElementById('artist-detail');
+    detail.classList.remove('hidden');
+
+    document.getElementById('artist-detail-name').textContent = artist.name;
+    document.getElementById('artist-detail-thumb').src = artist.thumbnail || '';
+
+    lastArtistData = artist;
+    renderArtistContent(artist);
 }
 
 function renderPlaylistDetailTracks(tracks) {

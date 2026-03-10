@@ -319,7 +319,7 @@ body {
     margin-top: 1px;
 }
 
-/* Song cards — smaller */
+/* Song cards — small squares, half album height */
 .home-card-song {
     width: 90px;
 }
@@ -327,21 +327,19 @@ body {
 .home-card-song .home-card-thumb {
     width: 90px;
     height: 90px;
-    border-radius: 50%;
+    border-radius: var(--radius);
 }
 
 .home-card-song .home-card-name {
     font-size: 10px;
-    text-align: center;
 }
 
 .home-card-song .home-card-artist {
     font-size: 9px;
-    text-align: center;
 }
 
 .home-card-song .home-card-info {
-    padding: 4px 0;
+    padding: 4px 2px;
 }
 
 /* Artist cards — circular, slightly larger */
@@ -379,7 +377,7 @@ body {
     align-items: center;
     justify-content: center;
     background: rgba(0, 0, 0, 0.5);
-    border-radius: 50%;
+    border-radius: var(--radius);
     opacity: 0;
     transition: opacity 0.15s;
 }

@@ -171,9 +171,9 @@ function createResultElement(track) {
                 ${playBtnContent}
             </button>
             <button class="action-btn download-btn ${isDownloaded ? 'done' : ''} ${isDownloading ? 'active' : ''}"
-                    title="${isDownloaded ? 'Downloaded' : isDownloading ? 'Downloading...' : 'Download'}"
+                    title="${isDownloaded ? 'Show in Finder' : isDownloading ? 'Downloading...' : 'Download'}"
                     data-video-id="${track.videoId}">
-                ${isDownloaded ? checkIcon() : isDownloading ? spinnerIcon(progress) : downloadIcon()}
+                ${isDownloaded ? folderIcon() : isDownloading ? spinnerIcon() : downloadIcon()}
             </button>
             <button class="action-btn playlist-btn" title="Add to playlist">
                 ${plusIcon()}
@@ -199,7 +199,15 @@ function createResultElement(track) {
     el.querySelector('.result-info').addEventListener('click', () => playTrack(track.videoId));
     el.querySelector('.result-thumb').addEventListener('click', () => playTrack(track.videoId));
     el.querySelector('.play-btn').addEventListener('click', (e) => { e.stopPropagation(); playTrack(track.videoId); });
-    el.querySelector('.download-btn').addEventListener('click', (e) => { e.stopPropagation(); downloadTrack(track.videoId); });
+    el.querySelector('.download-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const filePath = AppState.downloadedPaths[track.videoId];
+        if (filePath) {
+            window.appAPI.showInFinder(filePath);
+        } else {
+            downloadTrack(track.videoId);
+        }
+    });
     el.querySelector('.playlist-btn').addEventListener('click', (e) => { e.stopPropagation(); showAddToPlaylist(track.videoId); });
 
     const importBtn = el.querySelector('.import-btn');
@@ -283,10 +291,10 @@ function updateDownloadButton(videoId, progress) {
     const btn = el.querySelector('.download-btn');
     if (btn) {
         if (progress >= 100) {
-            btn.innerHTML = checkIcon();
+            btn.innerHTML = folderIcon();
             btn.classList.add('done');
             btn.classList.remove('active');
-            btn.title = 'Downloaded';
+            btn.title = 'Show in Finder';
             if (progressBar) progressBar.remove();
             el.classList.remove('downloading');
         } else {
@@ -359,7 +367,7 @@ function downloadIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 }
 function checkIcon() {
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
 }
 function plusIcon() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';

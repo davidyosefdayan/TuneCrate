@@ -18,7 +18,13 @@ const playerDuration = document.getElementById('player-duration');
 document.getElementById('player-play-btn').addEventListener('click', togglePlayPause);
 
 document.getElementById('player-download-btn').addEventListener('click', () => {
-    if (AppState.currentTrack) downloadTrack(AppState.currentTrack.videoId);
+    if (!AppState.currentTrack) return;
+    const filePath = AppState.downloadedPaths[AppState.currentTrack.videoId];
+    if (filePath) {
+        window.appAPI.showInFinder(filePath);
+    } else {
+        downloadTrack(AppState.currentTrack.videoId);
+    }
 });
 
 document.getElementById('player-playlist-btn').addEventListener('click', () => {
@@ -254,10 +260,10 @@ function updatePlayerActions() {
     const dlBtn = document.getElementById('player-download-btn');
     if (dlBtn) {
         if (isDownloaded) {
-            dlBtn.innerHTML = checkIcon();
+            dlBtn.innerHTML = folderIcon();
             dlBtn.classList.add('done');
             dlBtn.classList.remove('active');
-            dlBtn.title = 'Downloaded';
+            dlBtn.title = 'Show in Finder';
         } else if (isDownloading) {
             dlBtn.innerHTML = spinnerIcon();
             dlBtn.classList.add('active');

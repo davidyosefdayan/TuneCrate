@@ -600,13 +600,13 @@ body {
 
 .action-btn.done {
     background: var(--bg-elevated);
-    color: var(--accent);
-    cursor: default;
+    color: var(--text-secondary);
+    cursor: pointer;
 }
 
 .action-btn.done:hover {
-    background: var(--bg-elevated);
-    color: var(--accent);
+    background: var(--accent);
+    color: white;
 }
 
 .action-btn.active,

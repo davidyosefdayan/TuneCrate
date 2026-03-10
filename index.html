@@ -115,36 +115,31 @@
 
     <!-- Library tab -->
     <div class="tab-content" id="tab-library">
-        <!-- Downloads section -->
-        <div class="library-section">
-            <div class="library-header">
-                <h3>Downloads</h3>
-                <span id="downloads-count" class="library-count"></span>
-            </div>
-            <div id="downloads-container" class="results-list downloads-list">
-                <div class="empty-state">
-                    <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Downloaded tracks will appear here
-                </div>
-            </div>
-        </div>
-
-        <!-- Playlists section -->
-        <div class="library-section">
-            <div class="library-header">
-                <h3>Playlists</h3>
+        <!-- Library list view -->
+        <div id="library-list-view" class="library-list-view">
+            <div class="library-list-header">
+                <h3>Library</h3>
                 <button id="create-playlist-btn" class="btn-small">+ New</button>
             </div>
-            <div id="playlists-container" class="playlists-list">
-                <div class="empty-state" style="padding: 20px">
-                    <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            <div id="library-list" class="library-list"></div>
+        </div>
+
+        <!-- Library detail view (opens when clicking a playlist/downloads) -->
+        <div id="library-detail" class="library-detail hidden">
+            <div class="library-detail-header">
+                <button id="library-detail-back" class="btn-icon detail-back-btn" title="Back">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
                     </svg>
-                    No playlists yet
+                </button>
+                <div id="library-detail-icon" class="library-detail-icon"></div>
+                <div class="library-detail-info">
+                    <div id="library-detail-title" class="library-detail-title"></div>
+                    <div id="library-detail-count" class="library-detail-count"></div>
                 </div>
+                <div id="library-detail-actions" class="library-detail-actions"></div>
             </div>
+            <div id="library-detail-tracks" class="results-list"></div>
         </div>
     </div>
 

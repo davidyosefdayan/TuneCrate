@@ -868,120 +868,167 @@ body {
    ============================================ */
 #tab-library {
     padding: 0;
+    overflow: hidden;
 }
 
-.library-section {
-    padding: 12px 12px 0;
+/* Library list view */
+.library-list-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
 }
 
-.library-section:last-child {
-    padding-bottom: 12px;
+.library-list-view.hidden {
+    display: none;
 }
 
-.library-header {
+.library-list-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    padding: 14px 14px 10px;
+    flex-shrink: 0;
 }
 
-.library-header h3 {
+.library-list-header h3 {
     font-size: 15px;
     font-weight: 700;
 }
 
-.library-count {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-left: 8px;
-}
-
-.downloads-list {
-    max-height: 300px;
-    overflow-y: auto;
-    border-radius: var(--radius);
-}
-
-.playlists-list {
+.library-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
 }
 
-.playlist-card {
-    background: var(--bg-secondary);
-    border-radius: var(--radius);
-    overflow: hidden;
-}
-
-.playlist-header {
+/* Library row — each playlist/downloads entry */
+.library-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
+    gap: 12px;
+    padding: 10px 14px;
     cursor: pointer;
 }
 
-.playlist-header:hover {
-    background: var(--bg-tertiary);
+.library-row:hover {
+    background: var(--bg-secondary);
 }
 
-.playlist-name {
-    font-weight: 600;
-    font-size: 13px;
-}
-
-.playlist-count {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-left: 6px;
-}
-
-.playlist-actions {
-    display: flex;
-    gap: 3px;
-    opacity: 0;
-}
-
-.playlist-header:hover .playlist-actions {
-    opacity: 1;
-}
-
-.playlist-tracks {
-    display: none;
-    border-top: 1px solid var(--border);
-}
-
-.playlist-tracks.expanded {
-    display: block;
-}
-
-.playlist-track {
+.library-row-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
-.playlist-track:hover {
+.library-row-icon-downloads {
     background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
-.playlist-track .result-actions {
-    opacity: 0;
+.library-row-initials {
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    line-height: 1;
 }
 
-.playlist-track:hover .result-actions {
-    opacity: 1;
+.library-row-info {
+    flex: 1;
+    min-width: 0;
 }
 
-.playlist-batch-actions {
+.library-row-name {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.library-row-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.library-row-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.library-empty-hint {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 24px 14px;
+}
+
+/* Library detail view */
+.library-detail {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.library-detail.hidden {
+    display: none;
+}
+
+.library-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.library-detail-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.library-detail-icon .library-row-initials {
+    font-size: 18px;
+}
+
+.library-detail-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.library-detail-title {
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.library-detail-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.library-detail-actions {
     display: flex;
     gap: 6px;
-    padding: 8px 12px;
-    border-top: 1px solid var(--border);
-    background: var(--bg-base);
+    flex-shrink: 0;
 }
 
 /* ============================================

@@ -27,8 +27,6 @@ async function initSettings() {
         syncToggle.closest('.setting-row').style.opacity = '0.4';
     }
 
-    // Auto-import
-    document.getElementById('auto-import-toggle').checked = settings.autoImport || false;
 }
 
 function updateDirDisplay(dir) {
@@ -82,11 +80,6 @@ document.querySelectorAll('input[name="default-format"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
         window.settingsAPI.set('defaultFormat', e.target.value);
     });
-});
-
-// Auto-import toggle
-document.getElementById('auto-import-toggle').addEventListener('change', (e) => {
-    window.settingsAPI.set('autoImport', e.target.checked);
 });
 
 // Open download folder

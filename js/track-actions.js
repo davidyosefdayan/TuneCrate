@@ -47,14 +47,6 @@ async function downloadTrack(videoId, { silent = false } = {}) {
             showToast(`Downloaded: ${track.title}`, 'success');
         }
 
-        if (!silent && AppState.resolveAvailable) {
-            const autoImport = await window.settingsAPI.get('autoImport');
-            if (autoImport) {
-                await window.resolveAPI.addToTimeline(filePath);
-                showToast('Added to Timeline', 'success');
-            }
-        }
-
         return filePath;
     } catch (err) {
         AppState.downloading.delete(videoId);

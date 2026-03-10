@@ -1,17 +1,76 @@
 // Home page module — renders sections from main process
+function renderSkeletonHome() {
+    const container = document.getElementById('home-sections');
+    container.innerHTML = '';
+
+    // Match real section order: songs, albums, artists, albums
+    const layout = [
+        { type: 'songs', count: 6 },
+        { type: 'albums', count: 6 },
+        { type: 'artists', count: 6 },
+        { type: 'albums', count: 6 }
+    ];
+
+    layout.forEach(({ type, count }) => {
+        const section = document.createElement('div');
+        section.className = 'home-section';
+
+        // Match real h4 title element
+        const title = document.createElement('h4');
+        title.innerHTML = '<span class="skeleton" style="display:inline-block;width:100px;height:13px"></span>';
+        section.appendChild(title);
+
+        const row = document.createElement('div');
+        row.className = 'home-row';
+
+        for (let i = 0; i < count; i++) {
+            // Use same classes as real cards so sizing/spacing matches exactly
+            const card = document.createElement('div');
+            card.className = 'home-card' +
+                (type === 'songs' ? ' home-card-song' : '') +
+                (type === 'artists' ? ' home-card-artist' : '');
+
+            const thumbWrap = document.createElement('div');
+            thumbWrap.className = 'home-card-thumb-wrap';
+            const thumb = document.createElement('div');
+            thumb.className = 'skeleton home-card-thumb';
+            thumbWrap.appendChild(thumb);
+            card.appendChild(thumbWrap);
+
+            const info = document.createElement('div');
+            info.className = 'home-card-info';
+            const nameLine = document.createElement('div');
+            nameLine.className = 'skeleton skeleton-text skeleton-text-long';
+            info.appendChild(nameLine);
+            if (type !== 'artists') {
+                const subLine = document.createElement('div');
+                subLine.className = 'skeleton skeleton-text skeleton-text-short';
+                info.appendChild(subLine);
+            }
+            card.appendChild(info);
+
+            row.appendChild(card);
+        }
+        section.appendChild(row);
+        container.appendChild(section);
+    });
+}
+
 async function loadHomeContent() {
     const loading = document.getElementById('home-loading');
     const container = document.getElementById('home-sections');
 
-    loading.style.display = '';
-    container.innerHTML = '';
+    loading.style.display = 'none';
+    renderSkeletonHome();
 
     try {
         AppState.homeSections = await window.musicAPI.getHomeContent();
-        loading.style.display = 'none';
+        container.innerHTML = '';
+        container.classList.add('home-sections-fade-in');
         renderHomeContent();
+        container.addEventListener('animationend', () => container.classList.remove('home-sections-fade-in'), { once: true });
     } catch (err) {
-        loading.innerHTML = '<div class="empty-state">Could not load home content</div>';
+        container.innerHTML = '<div class="empty-state">Could not load home content</div>';
     }
 }
 

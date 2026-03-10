@@ -146,6 +146,9 @@ async function startPreview(track, { forceReload = false } = {}) {
     isPlaying = false;
     updatePlayerIcons();
     updatePlayerActions();
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
 
     updateListPlayButtons();
 
@@ -168,11 +171,6 @@ async function startPreview(track, { forceReload = false } = {}) {
             if (missingLocalFile && source === 'stream') {
                 showToast('Local file missing. Streaming instead.');
             }
-
-            // Stop any current playback cleanly
-            audio.pause();
-            audio.removeAttribute('src');
-            audio.load();
 
             audio.src = playUrl;
             audio.load();

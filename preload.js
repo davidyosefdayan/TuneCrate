@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron/renderer');
 contextBridge.exposeInMainWorld('musicAPI', {
     search: (query) => ipcRenderer.invoke('music:search', query),
     getHomeSections: () => ipcRenderer.invoke('music:getHomeSections'),
+    getHomeContent: () => ipcRenderer.invoke('home:getSections'),
     getPlaylistTracks: (playlistId) => ipcRenderer.invoke('music:getPlaylistTracks', playlistId),
     getArtist: (artistId) => ipcRenderer.invoke('music:getArtist', artistId),
     getArtistSongs: (artistId) => ipcRenderer.invoke('music:getArtistSongs', artistId),
@@ -43,6 +44,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
 
 contextBridge.exposeInMainWorld('appAPI', {
     isResolveAvailable: () => ipcRenderer.invoke('app:isResolveAvailable'),
+    getProfile: () => ipcRenderer.invoke('app:getProfile'),
     getPreviewUrl: (videoId) => ipcRenderer.invoke('app:getPreviewUrl', videoId),
     resolveTrackSource: (videoId, localPath) => ipcRenderer.invoke('app:resolveTrackSource', videoId, localPath),
     isFileAvailable: (filePath) => ipcRenderer.invoke('app:isFileAvailable', filePath),

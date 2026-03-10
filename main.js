@@ -48,8 +48,11 @@ const PlaylistStore = require('./lib/playlist-store');
 const DownloadStore = require('./lib/download-store');
 const SettingsStore = require('./lib/settings-store');
 const { resolveYtdlpPath } = require('./lib/ytdlp-resolver');
+const Profile = require('./lib/profile');
 
 console.log('[BOOT] Modules loaded');
+const profile = new Profile(__dirname);
+console.log(`[BOOT] Profile mode: ${profile.getMode()}`);
 const ytmusic = new YTMusicSearch();
 const settings = new SettingsStore();
 const playlists = new PlaylistStore();
@@ -189,6 +192,153 @@ async function startDownload(videoId, title, format, onProgress) {
     }
 }
 
+// --- Home sections builder ---
+async function buildHomeSections() {
+    let artistIds = [];
+
+    if (profile.getMode() === 'curated') {
+        const picks = profile.getRandomArtists(12);
+        artistIds = picks.map(a => a.artistId);
+    } else {
+        // Open mode: get home sections from YT Music, extract unique artist IDs
+        try {
+            const sections = await ytmusic.getHomeSections();
+            const seen = new Set();
+            for (const section of sections) {
+                for (const item of (section.items || [])) {
+                    if (item.artist && item.videoId) {
+                        // Search for the artist to get their ID
+                        const id = item.artistId || item.id;
+                        if (id && !seen.has(id)) {
+                            seen.add(id);
+                            artistIds.push(id);
+                        }
+                    }
+                }
+            }
+            // Take 8-10 unique artist IDs
+            artistIds = artistIds.slice(0, 10);
+        } catch (err) {
+            console.warn('[HOME] Failed to get home sections:', err.message);
+            return [];
+        }
+    }
+
+    if (artistIds.length === 0) return [];
+
+    // Fetch artist details in parallel
+    const results = await Promise.allSettled(
+        artistIds.map(id => ytmusic.getArtist(id))
+    );
+
+    const artists = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value);
+
+    return assembleHomeSections(artists);
+}
+
+function assembleHomeSections(artistResults) {
+    const allSongs = [];
+    const allAlbums = [];
+    const allArtists = [];
+
+    for (const artist of artistResults) {
+        // Collect songs
+        if (artist.topSongs) {
+            for (const song of artist.topSongs) {
+                allSongs.push({
+                    videoId: song.videoId,
+                    name: song.title,
+                    artist: song.artist,
+                    artistId: song.artistId,
+                    duration: song.duration,
+                    thumbnail: song.thumbnail,
+                    thumbnailSmall: song.thumbnail
+                });
+            }
+        }
+
+        // Collect albums + singles
+        const albums = [...(artist.topAlbums || []), ...(artist.topSingles || [])];
+        for (const album of albums) {
+            allAlbums.push({
+                albumId: album.albumId,
+                playlistId: album.playlistId,
+                name: album.name,
+                artist: artist.name,
+                artistId: artist.artistId,
+                year: album.year,
+                thumbnail: album.thumbnail,
+                thumbnailSmall: album.thumbnail
+            });
+        }
+
+        // Collect artist cards
+        allArtists.push({
+            artistId: artist.artistId,
+            name: artist.name,
+            thumbnail: artist.thumbnail,
+            thumbnailSmall: artist.thumbnail
+        });
+    }
+
+    // Shuffle helpers
+    const shuffle = arr => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    };
+
+    const sections = [];
+
+    // Quick Picks — ~20 random songs
+    if (allSongs.length > 0) {
+        sections.push({
+            id: 'quick-picks',
+            title: 'Quick Picks',
+            type: 'songs',
+            items: shuffle(allSongs).slice(0, 20)
+        });
+    }
+
+    // Featured Albums — ~12 random albums
+    if (allAlbums.length > 0) {
+        sections.push({
+            id: 'featured-albums',
+            title: 'Featured Albums',
+            type: 'albums',
+            items: shuffle(allAlbums).slice(0, 12)
+        });
+    }
+
+    // Artists — all fetched, shuffled
+    if (allArtists.length > 0) {
+        sections.push({
+            id: 'artists',
+            title: 'Artists',
+            type: 'artists',
+            items: shuffle(allArtists)
+        });
+    }
+
+    // New Releases — albums sorted by year desc
+    const withYear = allAlbums.filter(a => a.year);
+    if (withYear.length > 0) {
+        sections.push({
+            id: 'new-releases',
+            title: 'New Releases',
+            type: 'albums',
+            items: [...withYear].sort((a, b) => (b.year || 0) - (a.year || 0)).slice(0, 12)
+        });
+    }
+
+    return sections;
+}
+
 // --- IPC Handlers ---
 function registerIpcHandlers() {
     // App
@@ -222,9 +372,20 @@ function registerIpcHandlers() {
         shell.openPath(dir);
     });
 
+    // Profile
+    ipcMain.handle('app:getProfile', () => profile.getProfile());
+
+    // Home sections (profile-aware)
+    ipcMain.handle('home:getSections', async () => {
+        return await buildHomeSections();
+    });
+
     // Music search
     ipcMain.handle('music:search', async (event, query) => {
-        const results = await ytmusic.search(query);
+        let results = await ytmusic.search(query);
+        if (profile.getMode() === 'curated') {
+            results = results.filter(r => profile.isArtistAllowed(r.artistId));
+        }
         const allIds = results.map(r => r.videoId);
         audioSources.prefetchUrls(allIds);
         return results;

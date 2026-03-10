@@ -5,6 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "start:open": "cp profiles/open.json app-profile.json && electron .",
+    "start:curated": "cp profiles/curated.json app-profile.json && electron .",
     "install-plugin": "node scripts/install-plugin.js",
     "download-binaries": "node scripts/download-binaries.js",
     "postinstall": "node scripts/download-binaries.js"

@@ -10,7 +10,7 @@ if (typeof globalThis.FormData === 'undefined') {
 }
 
 console.log('[BOOT] Starting...');
-const { app, BrowserWindow, ipcMain, shell, net, protocol } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, net, protocol } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
@@ -537,6 +537,34 @@ function createWindow() {
     });
 
     mainWindow.loadFile('index.html');
+
+    // Custom menu without zoom roles
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+        {
+            label: app.name,
+            submenu: [
+                { role: 'about' },
+                { type: 'separator' },
+                { role: 'hide' },
+                { role: 'hideOthers' },
+                { role: 'unhide' },
+                { type: 'separator' },
+                { role: 'quit' }
+            ]
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                { role: 'selectAll' }
+            ]
+        }
+    ]));
 
     mainWindow.on('close', () => {
         app.quit();

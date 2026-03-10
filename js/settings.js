@@ -6,8 +6,10 @@ async function initSettings() {
     document.getElementById('download-dir-display').textContent =
         settings.downloadDir.replace(/^\/Users\/[^/]+/, '~');
 
-    // Default format
-    document.getElementById('default-format').value = settings.defaultFormat || 'mp3';
+    // Default format (radio buttons)
+    const format = settings.defaultFormat || 'mp3';
+    const radio = document.querySelector(`input[name="default-format"][value="${format}"]`);
+    if (radio) radio.checked = true;
 
     // Auto-import
     document.getElementById('auto-import-toggle').checked = settings.autoImport || false;
@@ -23,9 +25,11 @@ document.getElementById('change-dir-btn').addEventListener('click', async () => 
     }
 });
 
-// Default format
-document.getElementById('default-format').addEventListener('change', (e) => {
-    window.settingsAPI.set('defaultFormat', e.target.value);
+// Default format (radio buttons)
+document.querySelectorAll('input[name="default-format"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        window.settingsAPI.set('defaultFormat', e.target.value);
+    });
 });
 
 // Auto-import toggle

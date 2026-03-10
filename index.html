@@ -145,40 +145,57 @@
 
     <!-- Settings tab -->
     <div class="tab-content" id="tab-settings">
-        <div class="settings-group">
-            <label class="setting-label">Download Directory</label>
-            <div class="setting-row">
+        <!-- Download Location -->
+        <div class="settings-card">
+            <label class="setting-label">Download Location</label>
+            <div class="setting-row" style="margin-top:8px">
                 <span id="download-dir-display" class="setting-value">~/Music/YouTube Music Resolve</span>
-                <button id="change-dir-btn" class="btn-small">Change</button>
+                <button id="change-dir-btn" class="btn-small">Browse</button>
             </div>
+            <button id="open-download-dir-btn" class="settings-link">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Open in Finder
+            </button>
         </div>
-        <div class="settings-group">
-            <label class="setting-label">Default Format</label>
-            <div class="setting-row">
-                <select id="default-format">
-                    <option value="mp3">MP3</option>
-                    <option value="wav">WAV</option>
-                </select>
-            </div>
+
+        <!-- Audio Preferences -->
+        <div class="settings-card">
+            <label class="setting-label">Audio Preferences</label>
+            <label class="settings-radio">
+                <input type="radio" name="default-format" value="mp3">
+                <div class="settings-radio-dot"></div>
+                <div class="settings-radio-text">
+                    <div class="settings-radio-title">MP3 — 320kbps (.mp3)</div>
+                    <div class="settings-radio-desc">Compressed audio, smaller file size.</div>
+                </div>
+            </label>
+            <label class="settings-radio">
+                <input type="radio" name="default-format" value="wav">
+                <div class="settings-radio-dot"></div>
+                <div class="settings-radio-text">
+                    <div class="settings-radio-title">WAV — 24 bit 48kHz (.wav)</div>
+                    <div class="settings-radio-desc">Lossless audio, original recording quality.</div>
+                </div>
+            </label>
         </div>
-        <div class="settings-group resolve-only" style="display:none;">
-            <label class="setting-label">Auto-import to Resolve</label>
-            <div class="setting-row">
+
+        <!-- Resolve Integration -->
+        <div class="settings-card resolve-only" style="display:none">
+            <label class="setting-label">DaVinci Resolve</label>
+            <div class="setting-row" style="margin-top:8px">
                 <label class="toggle">
                     <input type="checkbox" id="auto-import-toggle">
                     <span class="toggle-slider"></span>
                 </label>
-                <span class="setting-hint">Automatically import downloaded tracks to Media Pool</span>
+                <span class="setting-hint">Auto-import downloads to Media Pool</span>
             </div>
         </div>
-        <div class="settings-group">
-            <label class="setting-label">Resolve Status</label>
+
+        <!-- Status -->
+        <div class="settings-card">
             <div class="setting-row">
                 <span id="resolve-status" class="status-badge disconnected">Standalone Mode</span>
             </div>
-        </div>
-        <div class="settings-group">
-            <button id="open-download-dir-btn" class="btn-small">Open Download Folder</button>
         </div>
     </div>
 

@@ -11,7 +11,9 @@ if (typeof globalThis.FormData === 'undefined') {
 
 console.log('[BOOT] Starting...');
 const { app, BrowserWindow, ipcMain, shell, net, protocol } = require('electron');
+const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 const { execFile } = require('child_process');
 
 const PLUGIN_ID = 'com.daviddayan.resolve.youtubemusic';
@@ -69,6 +71,98 @@ const audioSources = new AudioSourceService({
         }
     }
 });
+
+function getAudioContentType(filePath) {
+    switch (path.extname(filePath).toLowerCase()) {
+        case '.mp3':
+            return 'audio/mpeg';
+        case '.wav':
+            return 'audio/wav';
+        case '.m4a':
+        case '.mp4':
+            return 'audio/mp4';
+        case '.webm':
+            return 'audio/webm';
+        case '.ogg':
+            return 'audio/ogg';
+        default:
+            return 'application/octet-stream';
+    }
+}
+
+function parseRangeHeader(rangeHeader, fileSize) {
+    if (!rangeHeader || !rangeHeader.startsWith('bytes=')) {
+        return null;
+    }
+
+    const [startText, endText] = rangeHeader.replace('bytes=', '').split('-', 2);
+    let start = startText ? Number.parseInt(startText, 10) : NaN;
+    let end = endText ? Number.parseInt(endText, 10) : NaN;
+
+    if (Number.isNaN(start)) {
+        const suffixLength = end;
+        if (Number.isNaN(suffixLength)) {
+            return null;
+        }
+        start = Math.max(fileSize - suffixLength, 0);
+        end = fileSize - 1;
+    } else if (Number.isNaN(end) || end >= fileSize) {
+        end = fileSize - 1;
+    }
+
+    if (start < 0 || start >= fileSize || end < start) {
+        return { invalid: true };
+    }
+
+    return { start, end };
+}
+
+async function handleLocalAudioRequest(request) {
+    const filePath = decodeURIComponent(request.url.replace('local-audio://', ''));
+
+    try {
+        const stats = await fs.promises.stat(filePath);
+        const fileSize = stats.size;
+        const contentType = getAudioContentType(filePath);
+        const range = parseRangeHeader(request.headers.get('range'), fileSize);
+
+        if (range?.invalid) {
+            return new Response(null, {
+                status: 416,
+                headers: {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Range': `bytes */${fileSize}`
+                }
+            });
+        }
+
+        const headers = {
+            'Accept-Ranges': 'bytes',
+            'Content-Type': contentType,
+            'Cache-Control': 'no-cache'
+        };
+
+        if (!range) {
+            headers['Content-Length'] = String(fileSize);
+            const stream = fs.createReadStream(filePath);
+            return new Response(Readable.toWeb(stream), { status: 200, headers });
+        }
+
+        const chunkSize = range.end - range.start + 1;
+        headers['Content-Length'] = String(chunkSize);
+        headers['Content-Range'] = `bytes ${range.start}-${range.end}/${fileSize}`;
+
+        const stream = fs.createReadStream(filePath, { start: range.start, end: range.end });
+        return new Response(Readable.toWeb(stream), { status: 206, headers });
+    } catch (error) {
+        if (error?.code === 'ENOENT') {
+            return new Response('File not found', { status: 404 });
+        }
+
+        console.warn(`[LOCAL-AUDIO] Failed to serve ${filePath}: ${error.message}`);
+        return new Response('Local audio failed', { status: 500 });
+    }
+}
 
 async function startDownload(videoId, title, format, onProgress) {
     audioSources.beginDownload(videoId);
@@ -255,10 +349,7 @@ protocol.registerSchemesAsPrivileged([{
 console.log('[BOOT] Waiting for app ready...');
 app.whenReady().then(async () => {
     // Register protocol handler for local audio files
-    protocol.handle('local-audio', (request) => {
-        const filePath = decodeURIComponent(request.url.replace('local-audio://', ''));
-        return net.fetch('file://' + filePath);
-    });
+    protocol.handle('local-audio', (request) => handleLocalAudioRequest(request));
     protocol.handle('preview-audio', (request) => audioSources.handlePreviewRequest(request));
     console.log('[BOOT] App ready');
     // Only try to connect to Resolve if we're running from the plugins directory

@@ -198,7 +198,7 @@ function renderAlbumCard(item) {
 
     card.addEventListener('click', () => {
         if (item.albumId) {
-            showAlbumView(item.albumId, item.name, item.thumbnail);
+            showAlbumView(item.albumId, item.name, item.thumbnail, item.artist, item.year);
         } else if (item.playlistId) {
             showPlaylistDetailView(item);
             onHomePlaylistClick(item);

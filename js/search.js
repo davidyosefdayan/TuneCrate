@@ -3,6 +3,51 @@ let searchResults = [];
 let currentSort = 'relevance';
 let isSearchActive = false;
 
+// Skeleton helpers for detail view headers
+function setDetailThumb(imgEl, src) {
+    if (src) {
+        imgEl.style.display = '';
+        imgEl.src = src;
+        // Remove skeleton sibling if exists
+        const skel = imgEl.parentElement.querySelector('.skeleton-thumb-placeholder');
+        if (skel) skel.remove();
+    } else {
+        imgEl.style.display = 'none';
+        // Insert a skeleton div in its place if not already there
+        if (!imgEl.parentElement.querySelector('.skeleton-thumb-placeholder')) {
+            const ph = document.createElement('div');
+            ph.className = 'skeleton skeleton-thumb-placeholder detail-view-thumb';
+            if (imgEl.classList.contains('artist-thumb')) ph.classList.add('artist-thumb');
+            imgEl.parentElement.insertBefore(ph, imgEl);
+        }
+    }
+}
+
+function setDetailText(el, text, skeletonWidth, skeletonHeight) {
+    if (text) {
+        el.textContent = text;
+    } else if (skeletonWidth) {
+        el.innerHTML = `<span class="skeleton" style="display:inline-block;width:${skeletonWidth}px;height:${skeletonHeight}px;border-radius:3px"></span>`;
+    } else {
+        el.textContent = '';
+    }
+}
+
+function renderSkeletonTracks(count = 8) {
+    let html = '';
+    for (let i = 0; i < count; i++) {
+        html += `<div class="result-item" style="pointer-events:none">
+            <div class="skeleton result-thumb"></div>
+            <div class="result-info">
+                <div class="skeleton" style="height:11px;width:${55 + Math.random() * 30}%;border-radius:3px"></div>
+                <div class="skeleton" style="height:9px;width:${35 + Math.random() * 25}%;border-radius:3px;margin-top:4px"></div>
+            </div>
+            <div class="skeleton" style="height:9px;width:28px;border-radius:3px"></div>
+        </div>`;
+    }
+    return html;
+}
+
 document.getElementById('search-btn').addEventListener('click', performSearch);
 document.getElementById('search-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') performSearch();
@@ -63,12 +108,7 @@ function showPlaylistDetailView(item) {
     document.getElementById('playlist-detail-artist').textContent = item.artist || '';
     document.getElementById('playlist-detail-count').textContent = '\u00A0';
 
-    document.getElementById('playlist-detail-tracks').innerHTML = `
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <span>Loading tracks...</span>
-        </div>
-    `;
+    document.getElementById('playlist-detail-tracks').innerHTML = renderSkeletonTracks(10);
 }
 
 function navigateBack() {
@@ -93,22 +133,19 @@ async function showArtistView(artistId, artistName, artistThumb) {
     const detail = document.getElementById('artist-detail');
     detail.classList.remove('hidden');
 
-    document.getElementById('artist-detail-name').textContent = artistName || '';
-    document.getElementById('artist-detail-thumb').src = artistThumb || '';
-    document.getElementById('artist-detail-content').innerHTML = `
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <span>Loading artist...</span>
-        </div>
-    `;
+    const artistThumbEl = document.getElementById('artist-detail-thumb');
+    const artistNameEl = document.getElementById('artist-detail-name');
+
+    setDetailThumb(artistThumbEl, artistThumb);
+    setDetailText(artistNameEl, artistName, 120, 14);
+
+    document.getElementById('artist-detail-content').innerHTML = renderSkeletonTracks(8);
 
     try {
         const artist = await window.musicAPI.getArtist(artistId);
 
-        document.getElementById('artist-detail-name').textContent = artist.name;
-        if (artist.thumbnail) {
-            document.getElementById('artist-detail-thumb').src = artist.thumbnail;
-        }
+        if (artist.name) setDetailText(artistNameEl, artist.name);
+        if (artist.thumbnail) setDetailThumb(artistThumbEl, artist.thumbnail);
 
         lastArtistData = artist;
         renderArtistContent(artist);
@@ -187,12 +224,7 @@ function renderArtistContent(artist) {
 async function loadAllArtistSongs(artistId) {
     const content = document.getElementById('artist-detail-content');
     // Replace top songs with all songs
-    content.innerHTML = `
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <span>Loading all songs...</span>
-        </div>
-    `;
+    content.innerHTML = renderSkeletonTracks(12);
 
     try {
         const songs = await window.musicAPI.getArtistSongs(artistId);
@@ -215,7 +247,7 @@ async function loadAllArtistSongs(artistId) {
     }
 }
 
-async function showAlbumView(albumId, albumName, albumThumb) {
+async function showAlbumView(albumId, albumName, albumThumb, albumArtist, albumYear) {
     if (!albumId) return;
 
     const currentView = captureCurrentView();
@@ -227,27 +259,28 @@ async function showAlbumView(albumId, albumName, albumThumb) {
     const detail = document.getElementById('album-detail');
     detail.classList.remove('hidden');
 
-    document.getElementById('album-detail-name').textContent = albumName || '';
-    document.getElementById('album-detail-artist').textContent = '';
-    document.getElementById('album-detail-year').textContent = '';
-    document.getElementById('album-detail-thumb').src = albumThumb || '';
-    document.getElementById('album-detail-tracks').innerHTML = `
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <span>Loading album...</span>
-        </div>
-    `;
+    const thumbEl = document.getElementById('album-detail-thumb');
+    const nameEl = document.getElementById('album-detail-name');
+    const artistEl = document.getElementById('album-detail-artist');
+    const yearEl = document.getElementById('album-detail-year');
+
+    setDetailThumb(thumbEl, albumThumb);
+    setDetailText(nameEl, albumName, 120, 14);
+    setDetailText(artistEl, albumArtist, 80, 11);
+    setDetailText(yearEl, albumYear ? String(albumYear) : null, 40, 10);
+
+    document.getElementById('album-detail-tracks').innerHTML = renderSkeletonTracks(10);
 
     try {
         const album = await window.musicAPI.getAlbum(albumId);
 
-        document.getElementById('album-detail-name').textContent = album.name;
-        document.getElementById('album-detail-artist').textContent = album.artist;
-        document.getElementById('album-detail-artist').dataset.artistId = album.artistId || '';
-        document.getElementById('album-detail-year').textContent = album.year ? String(album.year) : '';
-        if (album.thumbnail) {
-            document.getElementById('album-detail-thumb').src = album.thumbnail;
+        if (album.name) setDetailText(nameEl, album.name);
+        if (album.artist) {
+            setDetailText(artistEl, album.artist);
+            artistEl.dataset.artistId = album.artistId || '';
         }
+        if (album.year) setDetailText(yearEl, String(album.year));
+        if (album.thumbnail) setDetailThumb(thumbEl, album.thumbnail);
 
         searchResults = album.songs;
 
@@ -292,7 +325,7 @@ function createAlbumCard(album) {
     card.appendChild(img);
     card.appendChild(info);
 
-    card.addEventListener('click', () => showAlbumView(album.albumId, album.name, album.thumbnail));
+    card.addEventListener('click', () => showAlbumView(album.albumId, album.name, album.thumbnail, album.artist, album.year));
 
     return card;
 }

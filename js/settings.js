@@ -11,9 +11,6 @@ async function initSettings() {
 
     // Auto-import
     document.getElementById('auto-import-toggle').checked = settings.autoImport || false;
-
-    // yt-dlp path
-    document.getElementById('ytdlp-path').value = settings.ytdlpPath || '';
 }
 
 // Change download dir
@@ -34,11 +31,6 @@ document.getElementById('default-format').addEventListener('change', (e) => {
 // Auto-import toggle
 document.getElementById('auto-import-toggle').addEventListener('change', (e) => {
     window.settingsAPI.set('autoImport', e.target.checked);
-});
-
-// yt-dlp path
-document.getElementById('ytdlp-path').addEventListener('change', (e) => {
-    window.settingsAPI.set('ytdlpPath', e.target.value);
 });
 
 // Open download folder

@@ -58,6 +58,7 @@ console.log('[BOOT] Instances created');
 
 const audioSources = new AudioSourceService({
     execFile,
+    fetchImpl: (url, options = {}) => net.fetch(url, options),
     resolveYtdlpPath,
     settings,
     baseDir: __dirname,
@@ -90,7 +91,8 @@ function registerIpcHandlers() {
     ipcMain.handle('app:isResolveAvailable', () => resolveAvailable);
     ipcMain.handle('app:getPreviewUrl', async (event, videoId) => {
         try {
-            const url = await audioSources.getAudioUrl(videoId);
+            const session = await audioSources.getOrCreatePreviewSession(videoId);
+            const url = session.protocolUrl;
             return { url, error: null };
         } catch (err) {
             return { url: null, error: err.message };
@@ -234,6 +236,9 @@ if (!isInsideResolve) {
 protocol.registerSchemesAsPrivileged([{
     scheme: 'local-audio',
     privileges: { stream: true, bypassCSP: true }
+}, {
+    scheme: 'preview-audio',
+    privileges: { stream: true, bypassCSP: true, supportFetchAPI: true }
 }]);
 
 // --- App lifecycle ---
@@ -244,6 +249,7 @@ app.whenReady().then(async () => {
         const filePath = decodeURIComponent(request.url.replace('local-audio://', ''));
         return net.fetch('file://' + filePath);
     });
+    protocol.handle('preview-audio', (request) => audioSources.handlePreviewRequest(request));
     console.log('[BOOT] App ready');
     // Only try to connect to Resolve if we're running from the plugins directory
     if (WorkflowIntegration && isInsideResolve) {

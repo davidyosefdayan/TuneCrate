@@ -139,7 +139,7 @@ function renderAlbumCard(item) {
 
     card.addEventListener('click', () => {
         if (item.albumId) {
-            showAlbumView(item.albumId, item.name);
+            showAlbumView(item.albumId, item.name, item.thumbnail);
         } else if (item.playlistId) {
             showPlaylistDetailView(item);
             onHomePlaylistClick(item);
@@ -177,7 +177,7 @@ function renderArtistCard(item) {
 
     card.addEventListener('click', () => {
         if (item.artistId) {
-            showArtistView(item.artistId, item.name);
+            showArtistView(item.artistId, item.name, item.thumbnail);
         }
     });
 

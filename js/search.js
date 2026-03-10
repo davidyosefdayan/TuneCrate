@@ -80,7 +80,7 @@ function navigateBack() {
     }
 }
 
-async function showArtistView(artistId, artistName) {
+async function showArtistView(artistId, artistName, artistThumb) {
     if (!artistId) return;
 
     // Push current view to history
@@ -94,7 +94,7 @@ async function showArtistView(artistId, artistName) {
     detail.classList.remove('hidden');
 
     document.getElementById('artist-detail-name').textContent = artistName || '';
-    document.getElementById('artist-detail-thumb').src = '';
+    document.getElementById('artist-detail-thumb').src = artistThumb || '';
     document.getElementById('artist-detail-content').innerHTML = `
         <div class="loading-state">
             <div class="spinner"></div>
@@ -215,7 +215,7 @@ async function loadAllArtistSongs(artistId) {
     }
 }
 
-async function showAlbumView(albumId, albumName) {
+async function showAlbumView(albumId, albumName, albumThumb) {
     if (!albumId) return;
 
     const currentView = captureCurrentView();
@@ -230,7 +230,7 @@ async function showAlbumView(albumId, albumName) {
     document.getElementById('album-detail-name').textContent = albumName || '';
     document.getElementById('album-detail-artist').textContent = '';
     document.getElementById('album-detail-year').textContent = '';
-    document.getElementById('album-detail-thumb').src = '';
+    document.getElementById('album-detail-thumb').src = albumThumb || '';
     document.getElementById('album-detail-tracks').innerHTML = `
         <div class="loading-state">
             <div class="spinner"></div>
@@ -292,7 +292,7 @@ function createAlbumCard(album) {
     card.appendChild(img);
     card.appendChild(info);
 
-    card.addEventListener('click', () => showAlbumView(album.albumId, album.name));
+    card.addEventListener('click', () => showAlbumView(album.albumId, album.name, album.thumbnail));
 
     return card;
 }

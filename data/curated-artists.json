@@ -5069,7 +5069,7 @@
   {
     "artistId": "UCfvfesQoH7YLS5mWL4byPZw",
     "name": "Liz Tatz",
-    "female": false,
+    "female": true,
     "type": "solo",
     "origin": "american",
     "famous": false,

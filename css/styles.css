@@ -8,6 +8,11 @@
     box-sizing: border-box;
 }
 
+img {
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
 :root {
     --bg-base: #0a0a0a;
     --bg-primary: #111111;

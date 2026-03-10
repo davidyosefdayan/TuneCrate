@@ -52,7 +52,9 @@ const ytmusic = new YTMusicSearch();
 const settings = new SettingsStore();
 const playlists = new PlaylistStore();
 const downloads = new DownloadStore();
-const downloader = new AudioDownloader(settings);
+const downloader = new AudioDownloader(settings, {
+    fetchImpl: (url, options = {}) => net.fetch(url, options)
+});
 let resolveBridge = null;
 console.log('[BOOT] Instances created');
 
@@ -70,18 +72,27 @@ const audioSources = new AudioSourceService({
 });
 
 async function startDownload(videoId, title, format, onProgress) {
-    const cachedUrl = audioSources.getDownloadUrl(videoId);
+    audioSources.beginDownload(videoId);
+    const cachedUrl = audioSources.resolveDownloadUrl(videoId);
+    console.log(`[DOWNLOAD] Start requested for ${videoId} (${format}) using ${cachedUrl ? 'reused media URL' : 'watch-page yt-dlp resolution'}`);
 
     try {
-        return await downloader.download(videoId, title, format, onProgress, cachedUrl);
+        const outputPath = await downloader.download(videoId, title, format, onProgress, cachedUrl);
+        console.log(`[DOWNLOAD] Completed for ${videoId}: ${outputPath}`);
+        return outputPath;
     } catch (error) {
         if (!cachedUrl) {
+            console.warn(`[DOWNLOAD] Failed for ${videoId} without reusable URL: ${error.message}`);
             throw error;
         }
 
         console.warn(`[DOWNLOAD] Cached URL failed for ${videoId}, retrying with a fresh lookup`);
         audioSources.invalidate(videoId);
-        return await downloader.download(videoId, title, format, onProgress, null);
+        const outputPath = await downloader.download(videoId, title, format, onProgress, null);
+        console.log(`[DOWNLOAD] Completed for ${videoId} after fresh retry: ${outputPath}`);
+        return outputPath;
+    } finally {
+        audioSources.endDownload(videoId);
     }
 }
 

@@ -17,6 +17,7 @@ function playTrack(videoId) {
 
 async function downloadTrack(videoId, { silent = false } = {}) {
     if (AppState.downloading.has(videoId) || hasLocalDownload(videoId)) {
+        console.log(`[DOWNLOAD] Ignoring duplicate request for ${videoId}. downloading=${AppState.downloading.has(videoId)} local=${hasLocalDownload(videoId)}`);
         return getLocalTrackPath(findTrack(videoId));
     }
 
@@ -35,10 +36,12 @@ async function downloadTrack(videoId, { silent = false } = {}) {
     }
 
     try {
+        console.log(`[DOWNLOAD] Renderer starting download for ${videoId} (${track.title})`);
         const filePath = await window.downloadAPI.start(videoId, track.title, format);
         AppState.downloading.delete(videoId);
         delete AppState.downloadProgress[videoId];
         await syncDownloadedTrack(track, filePath);
+        console.log(`[DOWNLOAD] Renderer finished download for ${videoId}: ${filePath}`);
 
         if (!silent) {
             showToast(`Downloaded: ${track.title}`, 'success');
@@ -56,6 +59,7 @@ async function downloadTrack(videoId, { silent = false } = {}) {
     } catch (err) {
         AppState.downloading.delete(videoId);
         delete AppState.downloadProgress[videoId];
+        console.warn(`[DOWNLOAD] Renderer download failed for ${videoId}: ${err.message}`);
         showToast(`Download failed: ${err.message}`, 'error');
         refreshTrackUi(videoId);
         return null;

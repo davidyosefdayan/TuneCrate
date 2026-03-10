@@ -627,6 +627,10 @@ body {
     color: var(--accent);
 }
 
+.action-btn.ready:hover {
+    color: white;
+}
+
 .action-btn.done {
     background: var(--bg-elevated);
     color: var(--text-secondary);

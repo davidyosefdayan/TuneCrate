@@ -52,15 +52,14 @@ const ytmusic = new YTMusicSearch();
 const settings = new SettingsStore();
 const playlists = new PlaylistStore();
 const downloads = new DownloadStore();
-const downloader = new AudioDownloader(settings, {
-    fetchImpl: (url, options = {}) => net.fetch(url, options)
-});
+const fetchImpl = (url, options = {}) => net.fetch(url, options);
+const downloader = new AudioDownloader(settings, { fetchImpl });
 let resolveBridge = null;
 console.log('[BOOT] Instances created');
 
 const audioSources = new AudioSourceService({
     execFile,
-    fetchImpl: (url, options = {}) => net.fetch(url, options),
+    fetchImpl,
     resolveYtdlpPath,
     settings,
     baseDir: __dirname,
@@ -73,23 +72,23 @@ const audioSources = new AudioSourceService({
 
 async function startDownload(videoId, title, format, onProgress) {
     audioSources.beginDownload(videoId);
-    const cachedUrl = audioSources.resolveDownloadUrl(videoId);
-    console.log(`[DOWNLOAD] Start requested for ${videoId} (${format}) using ${cachedUrl ? 'reused media URL' : 'watch-page yt-dlp resolution'}`);
+    const downloadSource = audioSources.resolveDownloadSource(videoId);
+    console.log(`[DOWNLOAD] Start requested for ${videoId} (${format}) using ${downloadSource.kind === 'media-url' ? downloadSource.label : 'watch-page yt-dlp resolution'}`);
 
     try {
-        const outputPath = await downloader.download(videoId, title, format, onProgress, cachedUrl);
+        const outputPath = await downloader.download(videoId, title, format, onProgress, downloadSource);
         console.log(`[DOWNLOAD] Completed for ${videoId}: ${outputPath}`);
         return outputPath;
     } catch (error) {
-        if (!cachedUrl) {
+        if (downloadSource.kind !== 'media-url') {
             console.warn(`[DOWNLOAD] Failed for ${videoId} without reusable URL: ${error.message}`);
             throw error;
         }
 
-        console.warn(`[DOWNLOAD] Cached URL failed for ${videoId}, retrying with a fresh lookup`);
+        console.warn(`[DOWNLOAD] Reused media URL failed for ${videoId}, retrying with a watch-page lookup`);
         audioSources.invalidate(videoId);
-        const outputPath = await downloader.download(videoId, title, format, onProgress, null);
-        console.log(`[DOWNLOAD] Completed for ${videoId} after fresh retry: ${outputPath}`);
+        const outputPath = await downloader.download(videoId, title, format, onProgress, { kind: 'watch-url' });
+        console.log(`[DOWNLOAD] Completed for ${videoId} after watch-page retry: ${outputPath}`);
         return outputPath;
     } finally {
         audioSources.endDownload(videoId);

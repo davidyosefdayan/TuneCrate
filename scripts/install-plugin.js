@@ -19,6 +19,8 @@ const INCLUDE = [
     'preload.js',
     'index.html',
     'WorkflowIntegration.node',
+    'app-profile.json',
+    'data',
     'css',
     'js',
     'lib',

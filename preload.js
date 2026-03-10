@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('playlistAPI', {
     addTrack: (playlistId, track) => ipcRenderer.invoke('playlist:addTrack', playlistId, track),
     removeTrack: (playlistId, videoId) => ipcRenderer.invoke('playlist:removeTrack', playlistId, videoId),
     setLocalPath: (playlistId, videoId, localPath) => ipcRenderer.invoke('playlist:setLocalPath', playlistId, videoId, localPath),
+    setTrackLocalPath: (videoId, localPath) => ipcRenderer.invoke('playlist:setTrackLocalPath', videoId, localPath),
 });
 
 contextBridge.exposeInMainWorld('settingsAPI', {
@@ -40,6 +41,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
 contextBridge.exposeInMainWorld('appAPI', {
     isResolveAvailable: () => ipcRenderer.invoke('app:isResolveAvailable'),
     getPreviewUrl: (videoId) => ipcRenderer.invoke('app:getPreviewUrl', videoId),
+    resolveTrackSource: (videoId, localPath) => ipcRenderer.invoke('app:resolveTrackSource', videoId, localPath),
+    isFileAvailable: (filePath) => ipcRenderer.invoke('app:isFileAvailable', filePath),
     isPreviewCached: (videoId) => ipcRenderer.invoke('app:isPreviewCached', videoId),
     onPrefetchReady: (callback) => ipcRenderer.on('prefetch:ready', (event, videoId) => callback(videoId)),
     invalidatePreviewCache: (videoId) => ipcRenderer.invoke('app:invalidatePreviewCache', videoId),

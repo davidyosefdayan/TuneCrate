@@ -24,14 +24,27 @@ function isWorkingBinary(binaryPath) {
     }
 }
 
+function findSystemBinary(binaryName) {
+    try {
+        const resolved = execSync(`which ${binaryName} 2>/dev/null`, { encoding: 'utf-8' }).trim();
+        return resolved || null;
+    } catch {
+        return null;
+    }
+}
+
 // yt-dlp
 const ytdlpPath = path.join(BIN_DIR, 'yt-dlp');
+const systemYtdlp = findSystemBinary('yt-dlp');
 if (fs.existsSync(ytdlpPath) && !isWorkingBinary(ytdlpPath)) {
     console.log('Bundled yt-dlp is not responding, re-downloading...');
     fs.unlinkSync(ytdlpPath);
 }
 
-if (!fs.existsSync(ytdlpPath)) {
+if (!fs.existsSync(ytdlpPath) && systemYtdlp && isWorkingBinary(systemYtdlp)) {
+    fs.symlinkSync(systemYtdlp, ytdlpPath);
+    console.log(`Linked to system yt-dlp: ${systemYtdlp}`);
+} else if (!fs.existsSync(ytdlpPath)) {
     console.log('Downloading yt-dlp...');
     let ytdlpUrl;
     if (platform === 'darwin') {

@@ -9,6 +9,121 @@ const AppState = {
     homeSections: []        // loaded from YouTube Music API
 };
 
+function applyDownloadHistory(history) {
+    AppState.downloadHistory = Array.isArray(history) ? history : [];
+    AppState.downloadedPaths = {};
+
+    for (const track of AppState.downloadHistory) {
+        if (track.localPath) {
+            AppState.downloadedPaths[track.videoId] = track.localPath;
+        }
+    }
+}
+
+async function reloadDownloadHistory() {
+    applyDownloadHistory(await window.downloadAPI.getHistory());
+    return AppState.downloadHistory;
+}
+
+function hasLocalDownload(videoId) {
+    return Boolean(AppState.downloadedPaths[videoId]);
+}
+
+function getLocalTrackPath(track) {
+    if (!track?.videoId) return null;
+    return AppState.downloadedPaths[track.videoId] || null;
+}
+
+function updateTrackReferences(videoId, updates) {
+    if (AppState.currentTrack?.videoId === videoId) {
+        AppState.currentTrack = { ...AppState.currentTrack, ...updates };
+    }
+
+    if (typeof searchResults !== 'undefined') {
+        searchResults = searchResults.map(track => (
+            track.videoId === videoId ? { ...track, ...updates } : track
+        ));
+    }
+
+    if (typeof playlists !== 'undefined') {
+        playlists = playlists.map(playlist => ({
+            ...playlist,
+            tracks: playlist.tracks.map(track => (
+                track.videoId === videoId ? { ...track, ...updates } : track
+            ))
+        }));
+    }
+}
+
+function refreshTrackUi(videoId) {
+    if (videoId && typeof refreshResultItem === 'function') {
+        refreshResultItem(videoId);
+    }
+    if (typeof loadDownloads === 'function') {
+        loadDownloads();
+    }
+    if (typeof renderPlaylists === 'function') {
+        renderPlaylists();
+    }
+    if (typeof updatePlayerActions === 'function') {
+        updatePlayerActions();
+    }
+}
+
+function markTrackLocalUnavailable(videoId) {
+    delete AppState.downloadedPaths[videoId];
+    AppState.downloadHistory = AppState.downloadHistory.map(track => (
+        track.videoId === videoId
+            ? { ...track, localPath: null, isAvailableLocally: false }
+            : track
+    ));
+    updateTrackReferences(videoId, { localPath: null, isAvailableLocally: false });
+    refreshTrackUi(videoId);
+}
+
+async function verifyLocalTrackPath(track) {
+    const filePath = getLocalTrackPath(track);
+    if (!filePath) return null;
+
+    const exists = await window.appAPI.isFileAvailable(filePath);
+    if (exists) return filePath;
+
+    markTrackLocalUnavailable(track.videoId);
+    return null;
+}
+
+async function revealTrackInFinder(track) {
+    const filePath = await verifyLocalTrackPath(track);
+    if (!filePath) {
+        showToast('Downloaded file is missing. You can redownload it.', 'error');
+        return false;
+    }
+
+    const shown = await window.appAPI.showInFinder(filePath);
+    if (!shown) {
+        markTrackLocalUnavailable(track.videoId);
+        showToast('Downloaded file is missing. You can redownload it.', 'error');
+        return false;
+    }
+
+    return true;
+}
+
+async function syncDownloadedTrack(track, filePath) {
+    await window.playlistAPI.setTrackLocalPath(track.videoId, filePath);
+    await window.downloadAPI.saveToHistory({
+        videoId: track.videoId,
+        title: track.title,
+        artist: track.artist,
+        duration: track.duration,
+        thumbnail: track.thumbnail,
+        localPath: filePath
+    });
+    await reloadDownloadHistory();
+    updateTrackReferences(track.videoId, { localPath: filePath, isAvailableLocally: true });
+    refreshTrackUi(track.videoId);
+}
+
 // Tab navigation
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -257,10 +372,7 @@ async function initApp() {
     });
 
     // Load download history
-    AppState.downloadHistory = await window.downloadAPI.getHistory();
-    AppState.downloadHistory.forEach(d => {
-        if (d.localPath) AppState.downloadedPaths[d.videoId] = d.localPath;
-    });
+    await reloadDownloadHistory();
 
     // Init sub-modules
     initSettings();

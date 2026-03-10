@@ -12,7 +12,6 @@ if (typeof globalThis.FormData === 'undefined') {
 console.log('[BOOT] Starting...');
 const { app, BrowserWindow, ipcMain, shell, net, protocol } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const { execFile } = require('child_process');
 
 const PLUGIN_ID = 'com.daviddayan.resolve.youtubemusic';
@@ -41,6 +40,7 @@ async function initResolveInterface() {
 // --- Lib modules ---
 const YTMusicSearch = require('./lib/ytmusic-search');
 const AudioDownloader = require('./lib/audio-downloader');
+const AudioSourceService = require('./lib/audio-source-service');
 const ResolveBridge = require('./lib/resolve-bridge');
 const PlaylistStore = require('./lib/playlist-store');
 const DownloadStore = require('./lib/download-store');
@@ -56,115 +56,32 @@ const downloader = new AudioDownloader(settings);
 let resolveBridge = null;
 console.log('[BOOT] Instances created');
 
-// --- Audio preview: get direct URL via yt-dlp ---
-let audioUrlCache = new Map(); // videoId -> { url, expires }
-const pendingAudioUrlRequests = new Map();
-const PREFETCH_CONCURRENCY = 2; // keep background work light so explicit play/download stays responsive
-const PREFETCH_LIMIT = 6;
-let prefetchQueue = [];
-let activePrefetches = 0;
-
-function getAudioUrl(videoId) {
-    const cached = audioUrlCache.get(videoId);
-    if (cached && cached.expires > Date.now()) {
-        console.log(`[PREVIEW] Cache hit for ${videoId}`);
-        return Promise.resolve(cached.url);
+const audioSources = new AudioSourceService({
+    execFile,
+    resolveYtdlpPath,
+    settings,
+    baseDir: __dirname,
+    onPrefetchReady: (videoId) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('prefetch:ready', videoId);
+        }
     }
+});
 
-    const pending = pendingAudioUrlRequests.get(videoId);
-    if (pending) {
-        console.log(`[PREVIEW] Reusing in-flight lookup for ${videoId}`);
-        return pending;
-    }
+async function startDownload(videoId, title, format, onProgress) {
+    const cachedUrl = audioSources.getDownloadUrl(videoId);
 
-    const request = new Promise((resolve, reject) => {
-        let ytdlp;
-        try {
-            ytdlp = resolveYtdlpPath(settings, __dirname);
-        } catch (error) {
-            return reject(new Error('yt-dlp is unavailable'));
+    try {
+        return await downloader.download(videoId, title, format, onProgress, cachedUrl);
+    } catch (error) {
+        if (!cachedUrl) {
+            throw error;
         }
 
-        const cached = audioUrlCache.get(videoId);
-        if (cached && cached.expires > Date.now()) {
-            console.log(`[PREVIEW] Cache hit for ${videoId}`);
-            return resolve(cached.url);
-        }
-        const args = [
-            '-f', 'wa/w/ba/b',  // worst audio first — small and fast to stream for preview
-            '--get-url',
-            '--no-playlist',
-            '--no-warnings',
-            '--js-runtimes', 'node',
-            '--extractor-args', 'youtube:player_client=default,web_music',
-            `https://www.youtube.com/watch?v=${videoId}`
-        ];
-
-        console.log(`[PREVIEW] Getting URL for ${videoId}...`);
-        const startTime = Date.now();
-
-        execFile(ytdlp, args, { timeout: 20000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
-            const elapsed = Date.now() - startTime;
-            if (err) {
-                const stderrSummary = (stderr || '').trim().split('\n').slice(-1)[0];
-                console.log(`[PREVIEW] Failed after ${elapsed}ms${stderrSummary ? `: ${stderrSummary}` : ''}`);
-                return reject(new Error('Could not get audio URL'));
-            }
-            const url = stdout.trim().split('\n')[0]; // take first URL only
-            if (!url || !url.startsWith('http')) return reject(new Error('No URL returned'));
-
-            console.log(`[PREVIEW] Got URL in ${elapsed}ms`);
-            // Cache for 4 hours (YouTube URLs expire after ~6h)
-            audioUrlCache.set(videoId, { url, expires: Date.now() + 4 * 60 * 60 * 1000 });
-            resolve(url);
-        });
-    }).finally(() => {
-        pendingAudioUrlRequests.delete(videoId);
-    });
-
-    pendingAudioUrlRequests.set(videoId, request);
-    return request;
-}
-
-// Pre-fetch URLs for search results — limited concurrency
-function prefetchUrls(videoIds) {
-    // Clear old queue (new search replaces old)
-    prefetchQueue = [];
-    for (const id of videoIds.slice(0, PREFETCH_LIMIT)) {
-        const cached = audioUrlCache.get(id);
-        if ((cached && cached.expires > Date.now()) || pendingAudioUrlRequests.has(id)) continue;
-        prefetchQueue.push(id);
+        console.warn(`[DOWNLOAD] Cached URL failed for ${videoId}, retrying with a fresh lookup`);
+        audioSources.invalidate(videoId);
+        return await downloader.download(videoId, title, format, onProgress, null);
     }
-    console.log(`[PREFETCH] Queued ${prefetchQueue.length} tracks (${PREFETCH_CONCURRENCY} concurrent, first ${PREFETCH_LIMIT} only)`);
-    // Kick off workers up to concurrency limit
-    for (let i = activePrefetches; i < PREFETCH_CONCURRENCY; i++) {
-        prefetchNext();
-    }
-}
-
-function prefetchNext() {
-    if (prefetchQueue.length === 0) return;
-    const videoId = prefetchQueue.shift();
-
-    // Skip if cached while waiting in queue
-    const cached = audioUrlCache.get(videoId);
-    if (cached && cached.expires > Date.now()) {
-        prefetchNext();
-        return;
-    }
-
-    activePrefetches++;
-    getAudioUrl(videoId)
-        .then(() => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('prefetch:ready', videoId);
-            }
-        })
-        .catch(() => {})
-        .finally(() => {
-            activePrefetches--;
-            prefetchNext(); // pick up next from queue
-        });
 }
 
 // --- IPC Handlers ---
@@ -173,14 +90,26 @@ function registerIpcHandlers() {
     ipcMain.handle('app:isResolveAvailable', () => resolveAvailable);
     ipcMain.handle('app:getPreviewUrl', async (event, videoId) => {
         try {
-            const url = await getAudioUrl(videoId);
+            const url = await audioSources.getAudioUrl(videoId);
             return { url, error: null };
         } catch (err) {
             return { url: null, error: err.message };
         }
     });
+    ipcMain.handle('app:resolveTrackSource', async (event, videoId, localPath) => {
+        try {
+            return await audioSources.resolveTrackSource(videoId, localPath);
+        } catch (err) {
+            return { url: null, error: err.message, source: null, missingLocalFile: Boolean(localPath) };
+        }
+    });
+    ipcMain.handle('app:isFileAvailable', (event, filePath) => audioSources.fileExists(filePath));
     ipcMain.handle('app:showInFinder', (event, filePath) => {
+        if (!audioSources.fileExists(filePath)) {
+            return false;
+        }
         shell.showItemInFolder(filePath);
+        return true;
     });
     ipcMain.handle('app:openDownloadDir', () => {
         const dir = settings.get('downloadDir');
@@ -191,7 +120,7 @@ function registerIpcHandlers() {
     ipcMain.handle('music:search', async (event, query) => {
         const results = await ytmusic.search(query);
         const allIds = results.map(r => r.videoId);
-        prefetchUrls(allIds);
+        audioSources.prefetchUrls(allIds);
         return results;
     });
 
@@ -199,7 +128,7 @@ function registerIpcHandlers() {
     ipcMain.handle('music:getPlaylistTracks', async (event, playlistId) => {
         const results = await ytmusic.getPlaylistTracks(playlistId);
         const allIds = results.map(r => r.videoId).filter(Boolean);
-        prefetchUrls(allIds);
+        audioSources.prefetchUrls(allIds);
         return results;
     });
 
@@ -211,39 +140,37 @@ function registerIpcHandlers() {
 
     // Check if a preview URL is cached (for UI status)
     ipcMain.handle('app:isPreviewCached', (event, videoId) => {
-        const cached = audioUrlCache.get(videoId);
-        return !!(cached && cached.expires > Date.now());
+        return audioSources.isPreviewCached(videoId);
     });
 
     // Invalidate cached preview URL (for retry on failure)
     ipcMain.handle('app:invalidatePreviewCache', (event, videoId) => {
-        audioUrlCache.delete(videoId);
+        audioSources.invalidate(videoId);
     });
 
     // Download — pass cached audio URL if available to skip re-fetching
     ipcMain.handle('download:start', async (event, videoId, title, format) => {
-        const cached = audioUrlCache.get(videoId);
-        const cachedUrl = (cached && cached.expires > Date.now()) ? cached.url : null;
-        return await downloader.download(videoId, title, format, (progress) => {
+        return await startDownload(videoId, title, format, (progress) => {
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('download:progress', { videoId, progress });
             }
-        }, cachedUrl);
+        });
     });
     ipcMain.handle('download:cancel', (event, videoId) => {
         downloader.cancel(videoId);
     });
-    ipcMain.handle('download:getHistory', () => downloads.getAll());
+    ipcMain.handle('download:getHistory', () => downloads.getAll().map(track => audioSources.serializeDownload(track)));
     ipcMain.handle('download:saveToHistory', (event, track) => downloads.add(track));
 
     // Playlists
-    ipcMain.handle('playlist:getAll', () => playlists.getAll());
+    ipcMain.handle('playlist:getAll', () => playlists.getAll().map(playlist => audioSources.serializePlaylist(playlist)));
     ipcMain.handle('playlist:create', (event, name) => playlists.create(name));
     ipcMain.handle('playlist:rename', (event, id, name) => playlists.rename(id, name));
     ipcMain.handle('playlist:delete', (event, id) => playlists.remove(id));
     ipcMain.handle('playlist:addTrack', (event, playlistId, track) => playlists.addTrack(playlistId, track));
     ipcMain.handle('playlist:removeTrack', (event, playlistId, videoId) => playlists.removeTrack(playlistId, videoId));
     ipcMain.handle('playlist:setLocalPath', (event, playlistId, videoId, localPath) => playlists.setLocalPath(playlistId, videoId, localPath));
+    ipcMain.handle('playlist:setTrackLocalPath', (event, videoId, localPath) => playlists.setTrackLocalPath(videoId, localPath));
 
     // Settings
     ipcMain.handle('settings:get', (event, key) => settings.get(key));

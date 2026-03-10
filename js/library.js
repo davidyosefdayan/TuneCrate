@@ -26,10 +26,12 @@ function loadDownloads() {
 }
 
 function createDownloadItem(track) {
-    const isPlaying = AppState.currentTrack?.videoId === track.videoId;
+    const isCurrentTrack = AppState.currentTrack?.videoId === track.videoId;
+    const showPause = isCurrentTrack && typeof isPlaying !== 'undefined' && isPlaying;
+    const isAvailableLocally = hasLocalDownload(track.videoId);
 
     const el = document.createElement('div');
-    el.className = `result-item ${isPlaying ? 'playing' : ''}`;
+    el.className = `result-item ${isCurrentTrack ? 'playing' : ''}`;
     el.dataset.videoId = track.videoId;
 
     el.innerHTML = `
@@ -37,15 +39,15 @@ function createDownloadItem(track) {
              onerror="this.style.background='var(--bg-tertiary)'">
         <div class="result-info">
             <div class="result-title">${escapeHtml(track.title)}</div>
-            <div class="result-meta">${escapeHtml(track.artist)}</div>
+            <div class="result-meta">${escapeHtml(track.artist)}${isAvailableLocally ? '' : ' · Not on disk'}</div>
         </div>
         <span class="result-duration">${formatDuration(track.duration)}</span>
         <div class="result-actions">
             <button class="action-btn play-btn" title="Play">
-                ${isPlaying && typeof isLoadingPreview !== 'undefined' && isLoadingPreview ? loadingSmallIcon() : isPlaying && typeof isPlaying !== 'undefined' ? pauseSmallIcon() : playSmallIcon()}
+                ${isCurrentTrack && typeof isLoadingPreview !== 'undefined' && isLoadingPreview ? loadingSmallIcon() : showPause ? pauseSmallIcon() : playSmallIcon()}
             </button>
-            <button class="action-btn" title="Show in Finder">
-                ${folderIcon()}
+            <button class="action-btn download-btn" title="${isAvailableLocally ? 'Show in Finder' : 'Download Again'}">
+                ${isAvailableLocally ? folderIcon() : downloadIcon()}
             </button>
             <button class="action-btn playlist-btn" title="Add to playlist">
                 ${plusIcon()}
@@ -61,10 +63,14 @@ function createDownloadItem(track) {
     el.querySelector('.play-btn').addEventListener('click', (e) => { e.stopPropagation(); startPreview(track); });
     el.querySelector('.result-info').addEventListener('click', () => startPreview(track));
 
-    const folderBtn = el.querySelectorAll('.action-btn')[1];
-    folderBtn.addEventListener('click', (e) => {
+    const downloadBtn = el.querySelector('.download-btn');
+    downloadBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (track.localPath) window.appAPI.showInFinder(track.localPath);
+        if (hasLocalDownload(track.videoId)) {
+            await revealTrackInFinder(track);
+        } else {
+            await downloadTrack(track.videoId);
+        }
     });
 
     const playlistBtn = el.querySelector('.playlist-btn');
@@ -74,14 +80,7 @@ function createDownloadItem(track) {
     if (importBtn) {
         importBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (track.localPath) {
-                try {
-                    await window.resolveAPI.addToTimeline(track.localPath);
-                    showToast('Added to Timeline', 'success');
-                } catch (err) {
-                    showToast('Import failed', 'error');
-                }
-            }
+            await importTrack(track.videoId);
         });
     }
 
@@ -151,6 +150,7 @@ function renderPlaylists() {
 
         if (pl.tracks.length > 0) {
             pl.tracks.forEach(t => {
+                const hasLocalFile = hasLocalDownload(t.videoId);
                 const trackEl = document.createElement('div');
                 trackEl.className = 'playlist-track';
                 trackEl.innerHTML = `
@@ -161,7 +161,9 @@ function renderPlaylists() {
                     </div>
                     <span class="result-duration">${formatDuration(t.duration)}</span>
                     <div class="result-actions">
-                        ${t.localPath ? `<button class="action-btn folder-btn" title="Show in Finder">${folderIcon()}</button>` : ''}
+                        <button class="action-btn local-btn" title="${hasLocalFile ? 'Show in Finder' : 'Download'}">
+                            ${hasLocalFile ? folderIcon() : downloadIcon()}
+                        </button>
                         <button class="action-btn remove-btn" title="Remove">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
@@ -170,13 +172,15 @@ function renderPlaylists() {
 
                 trackEl.querySelector('.result-info').addEventListener('click', () => startPreview(t));
 
-                const folderBtn = trackEl.querySelector('.folder-btn');
-                if (folderBtn) {
-                    folderBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        window.appAPI.showInFinder(t.localPath);
-                    });
-                }
+                const localBtn = trackEl.querySelector('.local-btn');
+                localBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (hasLocalDownload(t.videoId)) {
+                        await revealTrackInFinder(t);
+                    } else {
+                        await downloadTrack(t.videoId);
+                    }
+                });
 
                 trackEl.querySelector('.remove-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -278,7 +282,7 @@ async function addToPlaylist(playlistId, track) {
         artist: track.artist,
         duration: track.duration,
         thumbnail: track.thumbnail,
-        localPath: AppState.downloadedPaths[track.videoId] || track.localPath || null
+        localPath: getLocalTrackPath(track)
     });
 
     modal.classList.add('hidden');
@@ -294,29 +298,16 @@ async function batchDownload(playlistId) {
     showToast(`Downloading ${pl.tracks.length} tracks...`);
 
     for (const track of pl.tracks) {
-        if (track.localPath) continue; // Skip already downloaded
+        if (hasLocalDownload(track.videoId)) continue;
         try {
             const filePath = await window.downloadAPI.start(track.videoId, track.title, format);
-            await window.playlistAPI.setLocalPath(playlistId, track.videoId, filePath);
-            AppState.downloadedPaths[track.videoId] = filePath;
-
-            // Save to download history
-            await window.downloadAPI.saveToHistory({
-                videoId: track.videoId,
-                title: track.title,
-                artist: track.artist,
-                duration: track.duration,
-                thumbnail: track.thumbnail,
-                localPath: filePath
-            });
+            await syncDownloadedTrack(track, filePath);
         } catch (err) {
             showToast(`Failed: ${track.title}`, 'error');
         }
     }
 
-    AppState.downloadHistory = await window.downloadAPI.getHistory();
-    loadDownloads();
-    await loadPlaylists();
+    renderPlaylists();
     showToast('Batch download complete', 'success');
 }
 
@@ -326,7 +317,7 @@ async function batchImport(playlistId) {
 
     let imported = 0;
     for (const track of pl.tracks) {
-        const filePath = track.localPath || AppState.downloadedPaths[track.videoId];
+        const filePath = await verifyLocalTrackPath(track);
         if (!filePath) continue;
         try {
             await window.resolveAPI.addToTimeline(filePath);

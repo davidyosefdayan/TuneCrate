@@ -17,11 +17,10 @@ const playerDuration = document.getElementById('player-duration');
 
 document.getElementById('player-play-btn').addEventListener('click', togglePlayPause);
 
-document.getElementById('player-download-btn').addEventListener('click', () => {
+document.getElementById('player-download-btn').addEventListener('click', async () => {
     if (!AppState.currentTrack) return;
-    const filePath = AppState.downloadedPaths[AppState.currentTrack.videoId];
-    if (filePath) {
-        window.appAPI.showInFinder(filePath);
+    if (hasLocalDownload(AppState.currentTrack.videoId)) {
+        await revealTrackInFinder(AppState.currentTrack);
     } else {
         downloadTrack(AppState.currentTrack.videoId);
     }
@@ -110,22 +109,21 @@ audio.addEventListener('error', () => {
     updatePlayerIcons();
 });
 
-async function getPlayUrl(track) {
-    // 1. Try local file if downloaded
-    const localPath = AppState.downloadedPaths[track.videoId] || track.localPath;
-    if (localPath) {
-        return 'local-audio://' + encodeURIComponent(localPath);
+async function getPlaySource(track) {
+    const localPath = getLocalTrackPath(track);
+    const source = await window.appAPI.resolveTrackSource(track.videoId, localPath);
+    if (source.missingLocalFile) {
+        markTrackLocalUnavailable(track.videoId);
     }
-
-    // 2. Try cached/fetched streaming URL
-    const { url, error } = await window.appAPI.getPreviewUrl(track.videoId);
-    if (error || !url) throw new Error(error || 'No URL');
-    return url;
+    if (source.error || !source.url) {
+        throw new Error(source.error || 'No URL');
+    }
+    return source;
 }
 
-async function startPreview(track) {
+async function startPreview(track, { forceReload = false } = {}) {
     // If same track, just toggle
-    if (AppState.currentTrack?.videoId === track.videoId && !isLoadingPreview) {
+    if (!forceReload && AppState.currentTrack?.videoId === track.videoId && !isLoadingPreview) {
         togglePlayPause();
         return;
     }
@@ -163,13 +161,16 @@ async function startPreview(track) {
         try {
             if (attempt === 1) {
                 const cached = await window.appAPI.isPreviewCached(track.videoId);
-                if (!cached && !AppState.downloadedPaths[track.videoId] && !track.localPath) {
+                if (!cached && !hasLocalDownload(track.videoId)) {
                     showToast('Loading preview...');
                 }
             }
 
-            const playUrl = await getPlayUrl(track);
+            const { url: playUrl, source, missingLocalFile } = await getPlaySource(track);
             if (currentLoadId !== loadId) return;
+            if (missingLocalFile && source === 'stream') {
+                showToast('Local file missing. Streaming instead.');
+            }
 
             // Stop any current playback cleanly
             audio.pause();
@@ -216,7 +217,7 @@ function togglePlayPause() {
     } else {
         audio.play().catch(() => {
             // If play fails (stale URL), retry with startPreview
-            startPreview(AppState.currentTrack);
+            startPreview(AppState.currentTrack, { forceReload: true });
         });
     }
 }
@@ -253,7 +254,7 @@ function updateListPlayButtons() {
 function updatePlayerActions() {
     if (!AppState.currentTrack) return;
     const videoId = AppState.currentTrack.videoId;
-    const isDownloaded = !!AppState.downloadedPaths[videoId];
+    const isDownloaded = hasLocalDownload(videoId);
     const isDownloading = AppState.downloading.has(videoId);
     const progress = AppState.downloadProgress[videoId] || 0;
 

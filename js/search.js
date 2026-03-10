@@ -139,20 +139,21 @@ function renderSearchResults(results) {
 }
 
 function createResultElement(track) {
-    const isPlaying = AppState.currentTrack?.videoId === track.videoId;
-    const isLoading = isPlaying && isLoadingPreview;
-    const isDownloaded = !!AppState.downloadedPaths[track.videoId];
+    const isCurrentTrack = AppState.currentTrack?.videoId === track.videoId;
+    const isLoading = isCurrentTrack && isLoadingPreview;
+    const showPause = isCurrentTrack && typeof isPlaying !== 'undefined' && isPlaying;
+    const isDownloaded = hasLocalDownload(track.videoId);
     const isDownloading = AppState.downloading.has(track.videoId);
     const progress = AppState.downloadProgress[track.videoId] || 0;
 
     const el = document.createElement('div');
-    el.className = `result-item ${isPlaying ? 'playing' : ''}`;
+    el.className = `result-item ${isCurrentTrack ? 'playing' : ''}`;
     el.dataset.videoId = track.videoId;
 
     let playBtnContent;
     if (isLoading) {
         playBtnContent = loadingSmallIcon();
-    } else if (isPlaying) {
+    } else if (showPause) {
         playBtnContent = pauseSmallIcon();
     } else {
         playBtnContent = playSmallIcon();
@@ -199,11 +200,10 @@ function createResultElement(track) {
     el.querySelector('.result-info').addEventListener('click', () => playTrack(track.videoId));
     el.querySelector('.result-thumb').addEventListener('click', () => playTrack(track.videoId));
     el.querySelector('.play-btn').addEventListener('click', (e) => { e.stopPropagation(); playTrack(track.videoId); });
-    el.querySelector('.download-btn').addEventListener('click', (e) => {
+    el.querySelector('.download-btn').addEventListener('click', async (e) => {
         e.stopPropagation();
-        const filePath = AppState.downloadedPaths[track.videoId];
-        if (filePath) {
-            window.appAPI.showInFinder(filePath);
+        if (hasLocalDownload(track.videoId)) {
+            await revealTrackInFinder(track);
         } else {
             downloadTrack(track.videoId);
         }
@@ -214,61 +214,6 @@ function createResultElement(track) {
     if (importBtn) importBtn.addEventListener('click', (e) => { e.stopPropagation(); importTrack(track.videoId); });
 
     return el;
-}
-
-function playTrack(videoId) {
-    const track = findTrack(videoId);
-    if (track) startPreview(track);
-}
-
-async function downloadTrack(videoId, { silent = false } = {}) {
-    if (AppState.downloading.has(videoId) || AppState.downloadedPaths[videoId]) return;
-
-    const track = findTrack(videoId);
-    if (!track) return;
-
-    const format = await window.settingsAPI.get('defaultFormat') || 'mp3';
-
-    AppState.downloading.add(videoId);
-    AppState.downloadProgress[videoId] = 0;
-    updateDownloadButton(videoId, 0);
-    if (!silent) showToast(`Downloading: ${track.title}`);
-
-    try {
-        const filePath = await window.downloadAPI.start(videoId, track.title, format);
-        AppState.downloadedPaths[videoId] = filePath;
-        AppState.downloading.delete(videoId);
-
-        // Save to download history
-        await window.downloadAPI.saveToHistory({
-            videoId: track.videoId,
-            title: track.title,
-            artist: track.artist,
-            duration: track.duration,
-            thumbnail: track.thumbnail,
-            localPath: filePath
-        });
-        AppState.downloadHistory = await window.downloadAPI.getHistory();
-        loadDownloads();
-
-        if (!silent) showToast(`Downloaded: ${track.title}`, 'success');
-
-        // Auto-import if setting enabled
-        if (!silent && AppState.resolveAvailable) {
-            const autoImport = await window.settingsAPI.get('autoImport');
-            if (autoImport) {
-                await window.resolveAPI.addToTimeline(filePath);
-                showToast('Added to Timeline', 'success');
-            }
-        }
-
-        refreshResultItem(videoId);
-    } catch (err) {
-        AppState.downloading.delete(videoId);
-        delete AppState.downloadProgress[videoId];
-        showToast(`Download failed: ${err.message}`, 'error');
-        refreshResultItem(videoId);
-    }
 }
 
 function updateDownloadButton(videoId, progress) {
@@ -312,48 +257,6 @@ function refreshResultItem(videoId) {
     if (!track) return;
     const newEl = createResultElement(track);
     oldEl.replaceWith(newEl);
-}
-
-async function importTrack(videoId) {
-    let filePath = AppState.downloadedPaths[videoId];
-
-    // Auto-download if not yet downloaded
-    if (!filePath) {
-        try {
-            await downloadTrack(videoId, { silent: true });
-            filePath = AppState.downloadedPaths[videoId];
-        } catch (err) {
-            showToast('Download failed', 'error');
-            return;
-        }
-        if (!filePath) {
-            showToast('Download failed', 'error');
-            return;
-        }
-    }
-
-    try {
-        const result = await window.resolveAPI.addToTimeline(filePath);
-        if (result) {
-            showToast('Added to Timeline', 'success');
-        } else {
-            showToast('Failed to add to Timeline', 'error');
-        }
-    } catch (err) {
-        showToast('Import failed', 'error');
-    }
-}
-
-function findTrack(videoId) {
-    return searchResults.find(t => t.videoId === videoId)
-        || AppState.downloadHistory.find(t => t.videoId === videoId)
-        || (AppState.currentTrack?.videoId === videoId ? AppState.currentTrack : null);
-}
-
-function showAddToPlaylist(videoId) {
-    const track = findTrack(videoId);
-    if (!track) return;
-    openPlaylistModal(track);
 }
 
 // SVG Icons

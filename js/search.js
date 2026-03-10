@@ -408,7 +408,6 @@ async function performSearch() {
     if (!query) return;
 
     showSearchView();
-    addRecentSearch(query);
 
     const container = document.getElementById('search-results');
     container.innerHTML = `

@@ -140,14 +140,15 @@ function renderSearchResults(results) {
 
 function createResultElement(track) {
     const isCurrentTrack = AppState.currentTrack?.videoId === track.videoId;
+    const isActivelyPlaying = isCurrentTrack && typeof isPlaying !== 'undefined' && isPlaying;
     const isLoading = isCurrentTrack && isLoadingPreview;
-    const showPause = isCurrentTrack && typeof isPlaying !== 'undefined' && isPlaying;
+    const showPause = isActivelyPlaying;
     const isDownloaded = hasLocalDownload(track.videoId);
     const isDownloading = AppState.downloading.has(track.videoId);
     const progress = AppState.downloadProgress[track.videoId] || 0;
 
     const el = document.createElement('div');
-    el.className = `result-item ${isCurrentTrack ? 'playing' : ''}`;
+    el.className = `result-item ${isActivelyPlaying ? 'playing' : ''}`;
     el.dataset.videoId = track.videoId;
 
     let playBtnContent;
@@ -168,7 +169,7 @@ function createResultElement(track) {
         </div>
         <span class="result-duration">${formatDuration(track.duration)}</span>
         <div class="result-actions">
-            <button class="action-btn play-btn ${isLoading ? 'loading' : ''}" title="Preview">
+            <button class="action-btn play-btn ${isLoading ? 'loading' : ''} ${showPause ? 'active' : ''}" title="Preview">
                 ${playBtnContent}
             </button>
             <button class="action-btn download-btn ${isDownloaded ? 'done' : ''} ${isDownloading ? 'active' : ''}"

@@ -697,12 +697,12 @@ body {
     align-self: center;
 }
 
-/* Play/pause button — same size as other action-btns, just accent colored */
+/* Play/pause button — accent only while actively playing */
 .player-btn {
     width: 26px;
     height: 26px;
     border-radius: 4px;
-    background: var(--accent);
+    background: var(--bg-elevated);
     border: none;
     cursor: pointer;
     position: relative;
@@ -710,12 +710,22 @@ body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    color: white;
+    color: var(--text-secondary);
 }
 
 .player-btn:hover {
     background: var(--accent-hover);
+    color: white;
 }
+
+.player-btn.active {
+    background: var(--accent);
+    color: white;
+}
+
+.player-btn.active:hover {
+    background: var(--accent-hover);
+    }
 
 .player-btn svg {
     width: 13px;

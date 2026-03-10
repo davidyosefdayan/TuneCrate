@@ -27,11 +27,12 @@ function loadDownloads() {
 
 function createDownloadItem(track) {
     const isCurrentTrack = AppState.currentTrack?.videoId === track.videoId;
-    const showPause = isCurrentTrack && typeof isPlaying !== 'undefined' && isPlaying;
+    const isActivelyPlaying = isCurrentTrack && typeof isPlaying !== 'undefined' && isPlaying;
+    const showPause = isActivelyPlaying;
     const isAvailableLocally = hasLocalDownload(track.videoId);
 
     const el = document.createElement('div');
-    el.className = `result-item ${isCurrentTrack ? 'playing' : ''}`;
+    el.className = `result-item ${isActivelyPlaying ? 'playing' : ''}`;
     el.dataset.videoId = track.videoId;
 
     el.innerHTML = `
@@ -43,7 +44,7 @@ function createDownloadItem(track) {
         </div>
         <span class="result-duration">${formatDuration(track.duration)}</span>
         <div class="result-actions">
-            <button class="action-btn play-btn" title="Play">
+            <button class="action-btn play-btn ${isCurrentTrack && typeof isLoadingPreview !== 'undefined' && isLoadingPreview ? 'loading' : ''} ${showPause ? 'active' : ''}" title="Play">
                 ${isCurrentTrack && typeof isLoadingPreview !== 'undefined' && isLoadingPreview ? loadingSmallIcon() : showPause ? pauseSmallIcon() : playSmallIcon()}
             </button>
             <button class="action-btn download-btn" title="${isAvailableLocally ? 'Show in Finder' : 'Download Again'}">

@@ -8,6 +8,7 @@ const playerBar = document.getElementById('player-bar');
 const playerThumb = document.getElementById('player-thumb');
 const playerTitle = document.getElementById('player-title');
 const playerSubtitle = document.getElementById('player-subtitle');
+const playerPlayBtn = document.getElementById('player-play-btn');
 const playIcon = document.getElementById('play-icon');
 const pauseIcon = document.getElementById('pause-icon');
 const loadingIcon = document.getElementById('loading-icon');
@@ -146,10 +147,6 @@ async function startPreview(track, { forceReload = false } = {}) {
     updatePlayerIcons();
     updatePlayerActions();
 
-    // Highlight playing item
-    document.querySelectorAll('.result-item').forEach(el => {
-        el.classList.toggle('playing', el.dataset.videoId === track.videoId);
-    });
     updateListPlayButtons();
 
     // Try up to 3 times: first with cache, then force fresh URL
@@ -226,6 +223,11 @@ function updatePlayerIcons() {
     playIcon.style.display = (isPlaying || isLoadingPreview) ? 'none' : 'block';
     pauseIcon.style.display = isPlaying ? 'block' : 'none';
     loadingIcon.style.display = isLoadingPreview ? 'block' : 'none';
+    playerPlayBtn.classList.toggle('active', isPlaying || isLoadingPreview);
+
+    document.querySelectorAll('.result-item').forEach((el) => {
+        el.classList.toggle('playing', isPlaying && el.dataset.videoId === AppState.currentTrack?.videoId);
+    });
 
     // Sync list view play buttons
     updateListPlayButtons();
@@ -240,13 +242,15 @@ function updateListPlayButtons() {
         const isCurrent = item.dataset.videoId === AppState.currentTrack?.videoId;
         if (isCurrent && isLoadingPreview) {
             btn.innerHTML = loadingSmallIcon();
+            btn.classList.remove('active');
             btn.classList.add('loading');
         } else if (isCurrent && isPlaying) {
             btn.innerHTML = pauseSmallIcon();
+            btn.classList.add('active');
             btn.classList.remove('loading');
         } else {
             btn.innerHTML = playSmallIcon();
-            btn.classList.remove('loading');
+            btn.classList.remove('active', 'loading');
         }
     });
 }

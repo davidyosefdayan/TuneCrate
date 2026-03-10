@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('resolveAPI', {
     importToMediaPool: (filePath) => ipcRenderer.invoke('resolve:importToMediaPool', filePath),
     addToTimeline: (filePath) => ipcRenderer.invoke('resolve:addToTimeline', filePath),
     isConnected: () => ipcRenderer.invoke('resolve:isConnected'),
+    getProjectName: () => ipcRenderer.invoke('resolve:getProjectName'),
 });
 
 contextBridge.exposeInMainWorld('playlistAPI', {
@@ -40,6 +41,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
     set: (key, value) => ipcRenderer.invoke('settings:set', key, value),
     getAll: () => ipcRenderer.invoke('settings:getAll'),
     selectDownloadDir: () => ipcRenderer.invoke('settings:selectDownloadDir'),
+    syncDownloadDir: () => ipcRenderer.invoke('settings:syncDownloadDir'),
 });
 
 contextBridge.exposeInMainWorld('appAPI', {

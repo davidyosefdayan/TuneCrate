@@ -475,6 +475,38 @@ function registerIpcHandlers() {
         return null;
     });
 
+    // Project sync — compute project-synced download directory
+    ipcMain.handle('settings:syncDownloadDir', async () => {
+        let projectName = null;
+        if (resolveAvailable && resolveBridge) {
+            try {
+                const project = await resolveBridge.getProject();
+                if (project) projectName = await project.GetName();
+            } catch { /* ignore */ }
+        }
+
+        const { DATA_DIR } = require('./lib/shared-paths');
+        const folder = projectName || 'Default Project';
+        const syncDir = path.join(DATA_DIR, 'Projects', folder);
+        if (!fs.existsSync(syncDir)) {
+            fs.mkdirSync(syncDir, { recursive: true });
+        }
+        settings.set('downloadDir', syncDir);
+        return syncDir;
+    });
+
+    // Project sync — get current Resolve project name for download dir
+    ipcMain.handle('resolve:getProjectName', async () => {
+        if (!resolveAvailable || !resolveBridge) return null;
+        try {
+            const project = await resolveBridge.getProject();
+            if (!project) return null;
+            return await project.GetName();
+        } catch {
+            return null;
+        }
+    });
+
     // Resolve (Studio mode only)
     ipcMain.handle('resolve:importToMediaPool', async (event, filePath) => {
         if (!resolveAvailable || !resolveBridge) return false;

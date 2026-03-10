@@ -1078,24 +1078,12 @@ body {
     font-family: 'SF Mono', 'Menlo', monospace;
 }
 
-/* Open in Finder link */
-.settings-link {
-    display: inline-flex;
+/* Inline icon button — same height as btn-small */
+.btn-icon-inline {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    margin-top: 10px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 11px;
-    font-family: inherit;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.settings-link:hover {
-    color: var(--accent);
+    justify-content: center;
+    padding: 7px 8px;
 }
 
 /* Radio buttons */
@@ -1153,6 +1141,19 @@ body {
 }
 
 .settings-radio-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+.settings-toggle-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.settings-toggle-desc {
     font-size: 11px;
     color: var(--text-muted);
     margin-top: 2px;

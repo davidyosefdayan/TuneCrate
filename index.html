@@ -151,11 +151,20 @@
             <div class="setting-row" style="margin-top:8px">
                 <span id="download-dir-display" class="setting-value">~/Music/YouTube Music Resolve</span>
                 <button id="change-dir-btn" class="btn-small">Browse</button>
+                <button id="open-download-dir-btn" class="btn-small btn-icon-inline" title="Open in Finder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                </button>
             </div>
-            <button id="open-download-dir-btn" class="settings-link">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                Open in Finder
-            </button>
+            <div class="setting-row" style="margin-top:10px">
+                <label class="toggle">
+                    <input type="checkbox" id="sync-to-project-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <div>
+                    <div class="settings-toggle-title">Sync to project location</div>
+                    <div class="settings-toggle-desc">Download to a folder matching the current Resolve project.</div>
+                </div>
+            </div>
         </div>
 
         <!-- Audio Preferences -->

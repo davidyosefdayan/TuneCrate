@@ -91,9 +91,9 @@ async function importTrack(videoId) {
     }
 }
 
-function showAddToPlaylist(videoId) {
+function showAddToPlaylist(videoId, anchorEl) {
     const track = findTrack(videoId);
     if (track) {
-        openPlaylistModal(track);
+        openPlaylistPopover(track, anchorEl);
     }
 }

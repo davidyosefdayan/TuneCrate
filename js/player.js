@@ -27,8 +27,8 @@ document.getElementById('player-download-btn').addEventListener('click', async (
     }
 });
 
-document.getElementById('player-playlist-btn').addEventListener('click', () => {
-    if (AppState.currentTrack) showAddToPlaylist(AppState.currentTrack.videoId);
+document.getElementById('player-playlist-btn').addEventListener('click', (e) => {
+    if (AppState.currentTrack) showAddToPlaylist(AppState.currentTrack.videoId, e.currentTarget);
 });
 
 document.getElementById('player-import-btn').addEventListener('click', async () => {

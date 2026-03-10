@@ -530,7 +530,7 @@ function createResultElement(track) {
             downloadTrack(track.videoId);
         }
     });
-    el.querySelector('.playlist-btn').addEventListener('click', (e) => { e.stopPropagation(); showAddToPlaylist(track.videoId); });
+    el.querySelector('.playlist-btn').addEventListener('click', (e) => { e.stopPropagation(); showAddToPlaylist(track.videoId, e.currentTarget); });
 
     const importBtn = el.querySelector('.import-btn');
     if (importBtn) importBtn.addEventListener('click', (e) => { e.stopPropagation(); importTrack(track.videoId); });

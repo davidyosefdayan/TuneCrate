@@ -292,34 +292,128 @@ async function removeFromPlaylist(playlistId, videoId) {
     await loadPlaylists();
 }
 
-// --- Playlist modal (add track to playlist) ---
-function openPlaylistModal(track) {
-    const modal = document.getElementById('playlist-modal');
-    const list = document.getElementById('playlist-modal-list');
+// --- Playlist popover (add track to playlist) ---
+function openPlaylistPopover(track, anchorEl) {
+    // Remove any existing popover
+    closePlaylistPopover();
 
-    if (playlists.length === 0) {
-        list.innerHTML = '<div class="empty-state" style="padding:10px">Create a playlist first</div>';
-    } else {
-        list.innerHTML = '';
-        playlists.forEach(pl => {
+    const popover = document.createElement('div');
+    popover.className = 'playlist-popover';
+    popover.id = 'playlist-popover';
+
+    // "New playlist" option
+    const newItem = document.createElement('div');
+    newItem.className = 'playlist-popover-item playlist-popover-new';
+    newItem.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>New playlist</span>
+    `;
+    newItem.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closePlaylistPopover();
+        const name = await showInputModal('Playlist name');
+        if (!name) return;
+        await window.playlistAPI.create(name);
+        await loadPlaylists();
+        // Add track to the newly created playlist
+        const updated = await window.playlistAPI.getAll();
+        const newest = updated[updated.length - 1];
+        if (newest) {
+            await addToPlaylist(newest.id, track);
+        } else {
+            showToast('Playlist created', 'success');
+        }
+    });
+    popover.appendChild(newItem);
+
+    // Existing playlists
+    if (playlists.length > 0) {
+        const divider = document.createElement('div');
+        divider.className = 'playlist-popover-divider';
+        popover.appendChild(divider);
+
+        playlists.forEach((pl, i) => {
             const item = document.createElement('div');
-            item.className = 'modal-playlist-item';
-            item.textContent = `${pl.name} (${pl.tracks.length})`;
-            item.addEventListener('click', () => addToPlaylist(pl.id, track));
-            list.appendChild(item);
+            item.className = 'playlist-popover-item';
+            const color = getPlaylistColor(pl.name);
+            const initials = getPlaylistInitials(pl.name);
+            item.innerHTML = `
+                <div class="playlist-popover-icon" style="background:${color}">
+                    <span>${escapeHtml(initials)}</span>
+                </div>
+                <span>${escapeHtml(pl.name)}</span>
+            `;
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closePlaylistPopover();
+                addToPlaylist(pl.id, track);
+            });
+            popover.appendChild(item);
         });
     }
 
-    modal.classList.remove('hidden');
-    modal._track = track;
+    // Position the popover near the anchor button
+    document.body.appendChild(popover);
+    positionPopover(popover, anchorEl);
+
+    // Close on outside click (next tick to avoid immediate close)
+    setTimeout(() => {
+        const close = (e) => {
+            if (!popover.contains(e.target)) {
+                closePlaylistPopover();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        document.addEventListener('click', close, true);
+        popover._closeHandler = close;
+    }, 0);
 }
 
-document.getElementById('modal-cancel').addEventListener('click', () => {
-    document.getElementById('playlist-modal').classList.add('hidden');
-});
+function positionPopover(popover, anchorEl) {
+    if (!anchorEl) {
+        // Fallback: center bottom of screen
+        popover.style.position = 'fixed';
+        popover.style.bottom = '80px';
+        popover.style.right = '12px';
+        return;
+    }
+
+    const rect = anchorEl.getBoundingClientRect();
+    popover.style.position = 'fixed';
+
+    // Try to position above the button, aligned to right
+    const popoverHeight = popover.offsetHeight;
+    const popoverWidth = popover.offsetWidth;
+
+    let top = rect.top - popoverHeight - 4;
+    let left = rect.right - popoverWidth;
+
+    // If not enough space above, show below
+    if (top < 8) {
+        top = rect.bottom + 4;
+    }
+
+    // Keep within screen
+    if (left < 8) left = 8;
+    if (top + popoverHeight > window.innerHeight - 8) {
+        top = window.innerHeight - popoverHeight - 8;
+    }
+
+    popover.style.top = top + 'px';
+    popover.style.left = left + 'px';
+}
+
+function closePlaylistPopover() {
+    const existing = document.getElementById('playlist-popover');
+    if (existing) {
+        if (existing._closeHandler) {
+            document.removeEventListener('click', existing._closeHandler, true);
+        }
+        existing.remove();
+    }
+}
 
 async function addToPlaylist(playlistId, track) {
-    const modal = document.getElementById('playlist-modal');
     if (!track) return;
 
     await window.playlistAPI.addTrack(playlistId, {
@@ -331,7 +425,6 @@ async function addToPlaylist(playlistId, track) {
         localPath: getLocalTrackPath(track)
     });
 
-    modal.classList.add('hidden');
     await loadPlaylists();
     showToast('Added to playlist', 'success');
 }

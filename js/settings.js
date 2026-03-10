@@ -59,15 +59,21 @@ document.getElementById('sync-to-project-toggle').addEventListener('change', asy
     updateSyncState(synced);
 
     if (synced) {
+        // Save the current user-chosen dir before overwriting
+        const currentDir = await window.settingsAPI.get('downloadDir');
+        await window.settingsAPI.set('userDownloadDir', currentDir);
         const syncDir = await window.settingsAPI.syncDownloadDir();
         if (syncDir) {
             updateDirDisplay(syncDir);
             showToast('Downloads synced to project', 'success');
         }
     } else {
-        // Restore default dir
-        const defaultDir = await window.settingsAPI.get('downloadDir');
-        updateDirDisplay(defaultDir);
+        // Restore the user-chosen dir from before sync
+        const userDir = await window.settingsAPI.get('userDownloadDir');
+        if (userDir) {
+            await window.settingsAPI.set('downloadDir', userDir);
+            updateDirDisplay(userDir);
+        }
     }
 });
 

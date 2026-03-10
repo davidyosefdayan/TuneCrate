@@ -487,7 +487,7 @@ function registerIpcHandlers() {
 
         const { DATA_DIR } = require('./lib/shared-paths');
         const folder = projectName || 'Default Project';
-        const syncDir = path.join(DATA_DIR, 'Projects', folder);
+        const syncDir = path.join(DATA_DIR, 'Projects', folder, 'YouTube Music Resolve');
         if (!fs.existsSync(syncDir)) {
             fs.mkdirSync(syncDir, { recursive: true });
         }

@@ -3,3 +3,5 @@ bin/yt-dlp
 bin/ffmpeg
 *.log
 *-player-script.js
+dist/
+.DS_Store

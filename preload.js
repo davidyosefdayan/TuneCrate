@@ -44,6 +44,14 @@ contextBridge.exposeInMainWorld('settingsAPI', {
     syncDownloadDir: () => ipcRenderer.invoke('settings:syncDownloadDir'),
 });
 
+contextBridge.exposeInMainWorld('updaterAPI', {
+    check: () => ipcRenderer.invoke('updater:check'),
+    download: (downloadUrl) => ipcRenderer.invoke('updater:download', downloadUrl),
+    apply: (zipPath) => ipcRenderer.invoke('updater:apply', zipPath),
+    getVersion: () => ipcRenderer.invoke('updater:getVersion'),
+    onProgress: (callback) => ipcRenderer.on('updater:progress', (event, progress) => callback(progress)),
+});
+
 contextBridge.exposeInMainWorld('appAPI', {
     isResolveAvailable: () => ipcRenderer.invoke('app:isResolveAvailable'),
     getProfile: () => ipcRenderer.invoke('app:getProfile'),

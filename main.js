@@ -49,6 +49,7 @@ const DownloadStore = require('./lib/download-store');
 const SettingsStore = require('./lib/settings-store');
 const { resolveYtdlpPath } = require('./lib/ytdlp-resolver');
 const Profile = require('./lib/profile');
+const updater = require('./lib/updater');
 
 console.log('[BOOT] Modules loaded');
 const profile = new Profile(__dirname);
@@ -506,6 +507,36 @@ function registerIpcHandlers() {
             return null;
         }
     });
+
+    // Updates
+    ipcMain.handle('updater:check', async () => {
+        try {
+            return await updater.checkForUpdates();
+        } catch (err) {
+            return { updateAvailable: false, error: err.message };
+        }
+    });
+    ipcMain.handle('updater:download', async (event, downloadUrl) => {
+        try {
+            const result = await updater.downloadUpdate(downloadUrl, (progress) => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('updater:progress', progress);
+                }
+            });
+            return { success: true, zipPath: result.zipPath };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
+    ipcMain.handle('updater:apply', async (event, zipPath) => {
+        try {
+            await updater.applyUpdate(zipPath);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
+    ipcMain.handle('updater:getVersion', () => updater.getCurrentVersion());
 
     // Resolve (Studio mode only)
     ipcMain.handle('resolve:importToMediaPool', async (event, filePath) => {

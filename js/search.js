@@ -33,10 +33,10 @@ function setDetailText(el, text, skeletonWidth, skeletonHeight) {
     }
 }
 
-function renderSkeletonTracks(count = 8) {
-    let html = '';
+function renderSkeletonTracks(count = 8, wrapped = false) {
+    let items = '';
     for (let i = 0; i < count; i++) {
-        html += `<div class="result-item" style="pointer-events:none">
+        items += `<div class="result-item" style="pointer-events:none">
             <div class="skeleton result-thumb"></div>
             <div class="result-info">
                 <div class="skeleton" style="height:11px;width:${55 + Math.random() * 30}%;border-radius:3px"></div>
@@ -45,7 +45,10 @@ function renderSkeletonTracks(count = 8) {
             <div class="skeleton" style="height:9px;width:28px;border-radius:3px"></div>
         </div>`;
     }
-    return html;
+    if (wrapped) {
+        return `<div class="detail-section"><div class="detail-songs-list">${items}</div></div>`;
+    }
+    return items;
 }
 
 document.getElementById('search-btn').addEventListener('click', performSearch);
@@ -139,7 +142,7 @@ async function showArtistView(artistId, artistName, artistThumb) {
     setDetailThumb(artistThumbEl, artistThumb);
     setDetailText(artistNameEl, artistName, 120, 14);
 
-    document.getElementById('artist-detail-content').innerHTML = renderSkeletonTracks(8);
+    document.getElementById('artist-detail-content').innerHTML = renderSkeletonTracks(8, true);
 
     try {
         const artist = await window.musicAPI.getArtist(artistId);
@@ -224,7 +227,7 @@ function renderArtistContent(artist) {
 async function loadAllArtistSongs(artistId) {
     const content = document.getElementById('artist-detail-content');
     // Replace top songs with all songs
-    content.innerHTML = renderSkeletonTracks(12);
+    content.innerHTML = renderSkeletonTracks(12, true);
 
     try {
         const songs = await window.musicAPI.getArtistSongs(artistId);
@@ -446,7 +449,7 @@ async function performSearch() {
     container.innerHTML = `
         <div class="loading-state">
             <div class="spinner"></div>
-            <span>Searching YouTube Music...</span>
+            <span>Searching TuneCrate...</span>
         </div>
     `;
 

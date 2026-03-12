@@ -1,7 +1,8 @@
 {
-  "name": "youtube-music-resolve",
+  "name": "tunecrate",
+  "productName": "TuneCrate",
   "version": "1.0.0",
-  "description": "YouTube Music plugin for DaVinci Resolve",
+  "description": "TuneCrate plugin for DaVinci Resolve",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

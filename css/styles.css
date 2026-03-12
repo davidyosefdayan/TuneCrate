@@ -1,5 +1,5 @@
 /* ============================================
-   YouTube Music for DaVinci Resolve
+   TuneCrate for DaVinci Resolve
    ============================================ */
 
 * {
@@ -1638,12 +1638,12 @@ select {
 }
 
 .detail-section-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 0 12px 8px;
+    color: var(--text-primary);
+    text-transform: none;
+    letter-spacing: 0;
+    padding: 0 22px 8px;
 }
 
 .detail-albums-row {
@@ -1711,7 +1711,7 @@ select {
 }
 
 .detail-songs-list {
-    padding: 0 10px 10px;
+    padding: 0 12px 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;

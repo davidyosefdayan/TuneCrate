@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https://*.ytimg.com https://*.ggpht.com https://*.googleusercontent.com data:; media-src 'self' https://*.googlevideo.com local-audio: preview-audio:; connect-src 'self' https://*.googlevideo.com; style-src 'self' 'unsafe-inline'; script-src 'self'">
-    <title>YouTube Music</title>
+    <title>TuneCrate</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <!-- Titlebar drag region -->
     <div class="titlebar">
-        <span class="titlebar-title">YouTube Music</span>
+        <span class="titlebar-title">TuneCrate</span>
     </div>
 
     <!-- Tab navigation -->
@@ -22,7 +23,7 @@
     <!-- Search / Home tab -->
     <div class="tab-content active" id="tab-search">
         <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Search YouTube Music..." autocomplete="off">
+            <input type="text" id="search-input" placeholder="Search TuneCrate..." autocomplete="off">
             <button id="search-clear-btn" class="btn-icon search-clear-btn hidden" title="Clear search">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -149,7 +150,7 @@
         <div class="settings-card">
             <label class="setting-label">Download Location</label>
             <div class="setting-row" style="margin-top:8px">
-                <span id="download-dir-display" class="setting-value">~/Music/YouTube Music Resolve</span>
+                <span id="download-dir-display" class="setting-value">~/Music/TuneCrate</span>
                 <button id="change-dir-btn" class="btn-small">Browse</button>
                 <button id="open-download-dir-btn" class="btn-small btn-icon-inline" title="Open in Finder">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>

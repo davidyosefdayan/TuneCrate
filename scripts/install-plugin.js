@@ -2,7 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const PLUGIN_NAME = 'YouTube Music';
+const PLUGIN_NAME = 'TuneCrate';
 const SOURCE_DIR = path.join(__dirname, '..');
 const TARGET_DIR = path.join(
     '/Library/Application Support/Blackmagic Design/DaVinci Resolve',
@@ -50,7 +50,7 @@ try {
 
     console.log(`\nPlugin installed to:\n  ${TARGET_DIR}\n`);
     console.log('Restart DaVinci Resolve, then open:');
-    console.log('  Workspace > Workflow Integrations > YouTube Music');
+    console.log('  Workspace > Workflow Integrations > TuneCrate');
 } catch (err) {
     if (err.code === 'EACCES') {
         console.error('Permission denied. Try running with sudo:');

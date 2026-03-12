@@ -16,7 +16,7 @@ const path = require('path');
 const { Readable } = require('stream');
 const { execFile } = require('child_process');
 
-const PLUGIN_ID = 'com.daviddayan.resolve.youtubemusic';
+const PLUGIN_ID = 'com.daviddayan.resolve.tunecrate';
 
 let mainWindow = null;
 let resolveAvailable = false;
@@ -487,7 +487,7 @@ function registerIpcHandlers() {
 
         const { DATA_DIR } = require('./lib/shared-paths');
         const folder = projectName || 'Default Project';
-        const syncDir = path.join(DATA_DIR, 'Projects', folder, 'YouTube Music Resolve');
+        const syncDir = path.join(DATA_DIR, 'Projects', folder, 'TuneCrate');
         if (!fs.existsSync(syncDir)) {
             fs.mkdirSync(syncDir, { recursive: true });
         }
@@ -530,6 +530,7 @@ function createWindow() {
         backgroundColor: '#0d0d0d',
         titleBarStyle: 'hiddenInset',
         alwaysOnTop: true,
+        icon: path.join(__dirname, 'assets', 'favicon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true
@@ -574,7 +575,7 @@ function createWindow() {
 // --- Prevent singleton lock conflict when Resolve plugin is also running ---
 const isInsideResolve = __dirname.includes('Workflow Integration Plugins');
 if (!isInsideResolve) {
-    app.setPath('userData', path.join(app.getPath('appData'), 'YouTube Music Resolve Standalone'));
+    app.setPath('userData', path.join(app.getPath('appData'), 'TuneCrate Standalone'));
 }
 
 // --- Custom protocol for local audio playback ---
@@ -589,6 +590,13 @@ protocol.registerSchemesAsPrivileged([{
 // --- App lifecycle ---
 console.log('[BOOT] Waiting for app ready...');
 app.whenReady().then(async () => {
+    // Set dock icon and name on macOS
+    if (process.platform === 'darwin' && app.dock) {
+        const { nativeImage } = require('electron');
+        const dockIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'favicon.png'));
+        if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon);
+    }
+
     // Register protocol handler for local audio files
     protocol.handle('local-audio', (request) => handleLocalAudioRequest(request));
     protocol.handle('preview-audio', (request) => audioSources.handlePreviewRequest(request));

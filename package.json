@@ -16,6 +16,8 @@
     "download-binaries": "node scripts/download-binaries.js",
     "postinstall": "node scripts/download-binaries.js",
     "build": "node scripts/build-release.js",
+    "build:mac": "node scripts/build-release.js --platform macos-arm64",
+    "build:windows": "node scripts/build-release.js --platform windows-x64",
     "build:all": "node scripts/build-release.js --all",
     "release": "node scripts/build-release.js --all"
   },

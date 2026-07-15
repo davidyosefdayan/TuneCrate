@@ -56,10 +56,20 @@ npm run start:curated    # launch in curated mode
 
 ## Installation
 
-### Prerequisites
+### For non-technical users
 
-- **Node.js** (v18+)
-- **DaVinci Resolve** (free or Studio) — for plugin mode
+Download the installer for your computer from the Releases page:
+
+- **macOS:** double-click the `.pkg`; keep **Curated Catalog** selected, or deselect it for the full open catalog
+- **Windows:** double-click the `.exe` file
+
+Follow the prompts, restart DaVinci Resolve, then open **Workspace → Workflow Integrations → TuneCrate**. The installer includes the app runtime, so Node.js and command-line setup are not required.
+
+> TuneCrate requires **DaVinci Resolve Studio**. Workflow Integrations are not available in the free edition.
+
+### Developer setup
+
+Requires Node.js 18 or newer.
 
 ### Setup
 
@@ -131,7 +141,9 @@ npm run build         # build for current platform
 npm run build:all     # build for macOS (ARM64 + x64) and Windows (x64)
 ```
 
-Builds are output as versioned `.zip` files ready for distribution. Tagged releases (`v*`) trigger the GitHub Actions pipeline to build and publish automatically.
+Builds are output as native `.pkg` (macOS) or `.exe` (Windows) installers ready for distribution. Tagged releases (`v*`) trigger the GitHub Actions pipeline to build and publish automatically.
+
+For a public macOS release, set `INSTALLER_SIGNING_IDENTITY` to your **Developer ID Installer** certificate name. To notarize and staple automatically, also set `APPLE_NOTARY_PROFILE` to a keychain profile created with `xcrun notarytool store-credentials`.
 
 ## License
 

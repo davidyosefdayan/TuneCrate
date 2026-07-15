@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Build platform-specific ZIP releases of the TuneCrate plugin.
+ * Build native, double-click installers for the TuneCrate plugin.
  *
  * Usage:
  *   node scripts/build-release.js                  # build for current platform
@@ -29,14 +29,13 @@ const INCLUDE = [
     'index.html',
     'WorkflowIntegration.node',
     'app-profile.json',
+    'profiles',
     'data',
     'css',
     'js',
     'lib',
     'node_modules',
     'scripts/download-binaries.js',
-    'scripts/install.sh',
-    'scripts/install.bat',
 ];
 
 // Platform-specific binary URLs
@@ -80,6 +79,95 @@ function copyItem(src, dest) {
     }
 }
 
+function buildMacInstaller(platform, pluginStageDir) {
+    if (os.platform() !== 'darwin') {
+        throw new Error(`Building ${platform} requires macOS.`);
+    }
+
+    const workDir = path.join(DIST, `.installer-${platform}`);
+    const baseRoot = path.join(workDir, 'base-root');
+    const curatedRoot = path.join(workDir, 'curated-root');
+    const scriptsDir = path.join(workDir, 'scripts');
+    const resourcesDir = path.join(workDir, 'resources');
+    const relativePluginPath = 'Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins/TuneCrate';
+    const baseInstallPath = path.join(baseRoot, relativePluginPath);
+    const curatedInstallPath = path.join(curatedRoot, relativePluginPath);
+    fs.rmSync(workDir, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(baseInstallPath), { recursive: true });
+    fs.mkdirSync(curatedInstallPath, { recursive: true });
+    fs.mkdirSync(scriptsDir, { recursive: true });
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    fs.renameSync(pluginStageDir, baseInstallPath);
+
+    // Open is the base/default payload. The optional curated component overlays
+    // only app-profile.json when its checkbox is selected in Installer.
+    fs.copyFileSync(path.join(ROOT, 'profiles', 'open.json'), path.join(baseInstallPath, 'app-profile.json'));
+    fs.copyFileSync(path.join(ROOT, 'profiles', 'curated.json'), path.join(curatedInstallPath, 'app-profile.json'));
+
+    const postinstallPath = path.join(scriptsDir, 'postinstall');
+    fs.writeFileSync(postinstallPath, `#!/bin/sh\nPLUGIN=\"/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins/TuneCrate\"\nfind \"$PLUGIN/bin\" -maxdepth 1 -type f -exec chmod 755 {} \\; 2>/dev/null || true\nexit 0\n`);
+    fs.chmodSync(postinstallPath, 0o755);
+
+    fs.writeFileSync(path.join(resourcesDir, 'welcome.html'), '<html><body><h1>Install TuneCrate</h1><p>This installs TuneCrate directly into DaVinci Resolve Studio.</p><p>On the next screen, keep <b>Curated Catalog</b> selected for the approved artist library, or deselect it for the full open catalog.</p></body></html>');
+    fs.writeFileSync(path.join(resourcesDir, 'conclusion.html'), '<html><body><h1>TuneCrate is installed</h1><p>Restart DaVinci Resolve, then choose <b>Workspace &gt; Workflow Integrations &gt; TuneCrate</b>.</p></body></html>');
+
+    const basePkg = path.join(workDir, 'TuneCrate-base.pkg');
+    const curatedPkg = path.join(workDir, 'TuneCrate-curated.pkg');
+    execSync(`pkgbuild --root "${baseRoot}" --identifier com.daviddayan.resolve.tunecrate.base --version "${VERSION}" --scripts "${scriptsDir}" --install-location / "${basePkg}"`, { stdio: 'inherit' });
+    execSync(`pkgbuild --root "${curatedRoot}" --identifier com.daviddayan.resolve.tunecrate.curated --version "${VERSION}" --install-location / "${curatedPkg}"`, { stdio: 'inherit' });
+
+    const distributionPath = path.join(workDir, 'Distribution.xml');
+    fs.writeFileSync(distributionPath, `<?xml version="1.0" encoding="utf-8"?>\n<installer-gui-script minSpecVersion="2">\n  <title>TuneCrate for DaVinci Resolve</title>\n  <organization>com.daviddayan</organization>\n  <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>\n  <options customize="always" require-scripts="false" rootVolumeOnly="true"/>\n  <welcome file="welcome.html" mime-type="text/html"/>\n  <conclusion file="conclusion.html" mime-type="text/html"/>\n  <choices-outline>\n    <line choice="base"/>\n    <line choice="curated"/>\n  </choices-outline>\n  <choice id="base" title="TuneCrate" visible="false" enabled="false" start_selected="true"><pkg-ref id="com.daviddayan.resolve.tunecrate.base"/></choice>\n  <choice id="curated" title="Curated Catalog (recommended)" description="Keep selected for the approved artist library. Deselect for the full open catalog." start_selected="true"><pkg-ref id="com.daviddayan.resolve.tunecrate.curated"/></choice>\n  <pkg-ref id="com.daviddayan.resolve.tunecrate.base" version="${VERSION}" onConclusion="none">TuneCrate-base.pkg</pkg-ref>\n  <pkg-ref id="com.daviddayan.resolve.tunecrate.curated" version="${VERSION}" onConclusion="none">TuneCrate-curated.pkg</pkg-ref>\n</installer-gui-script>\n`);
+
+    const unsignedPath = path.join(workDir, 'TuneCrate-unsigned.pkg');
+    const outputPath = path.join(DIST, `TuneCrate-${platform}.pkg`);
+    execSync(`productbuild --distribution "${distributionPath}" --resources "${resourcesDir}" --package-path "${workDir}" "${unsignedPath}"`, { stdio: 'inherit' });
+    fs.rmSync(outputPath, { force: true });
+
+    const signingIdentity = process.env.INSTALLER_SIGNING_IDENTITY;
+    if (signingIdentity) {
+        console.log(`  Signing installer package with ${signingIdentity}...`);
+        execSync(`productsign --sign "${signingIdentity}" "${unsignedPath}" "${outputPath}"`, { stdio: 'inherit' });
+    } else {
+        fs.renameSync(unsignedPath, outputPath);
+        console.warn('  Warning: INSTALLER_SIGNING_IDENTITY is not set; this development package is unsigned.');
+    }
+
+    const notaryProfile = process.env.APPLE_NOTARY_PROFILE;
+    if (notaryProfile) {
+        if (!signingIdentity) {
+            throw new Error('APPLE_NOTARY_PROFILE requires INSTALLER_SIGNING_IDENTITY.');
+        }
+        console.log('  Submitting installer to Apple for notarization...');
+        execSync(`xcrun notarytool submit "${outputPath}" --keychain-profile "${notaryProfile}" --wait`, { stdio: 'inherit' });
+        execSync(`xcrun stapler staple "${outputPath}"`, { stdio: 'inherit' });
+    }
+    fs.rmSync(workDir, { recursive: true, force: true });
+    return outputPath;
+}
+
+function findInnoCompiler() {
+    const candidates = [
+        process.env.ISCC_PATH,
+        'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe',
+        'C:\\Program Files\\Inno Setup 6\\ISCC.exe'
+    ].filter(Boolean);
+    return candidates.find(candidate => fs.existsSync(candidate)) || null;
+}
+
+function buildWindowsInstaller(platform, pluginStageDir) {
+    if (os.platform() !== 'win32') {
+        throw new Error(`Building ${platform} requires Windows and Inno Setup 6.`);
+    }
+    const compiler = findInnoCompiler();
+    if (!compiler) {
+        throw new Error('Inno Setup 6 was not found. Install it with: choco install innosetup');
+    }
+    const scriptPath = path.join(ROOT, 'scripts', 'windows-installer.iss');
+    execSync(`"${compiler}" /DSourceDir="${pluginStageDir}" /DOutputDir="${DIST}" /DAppVersion="${VERSION}" "${scriptPath}"`, { stdio: 'inherit' });
+    return path.join(DIST, `TuneCrate-${platform}.exe`);
+}
+
 function buildForPlatform(platform) {
     console.log(`\nBuilding TuneCrate v${VERSION} for ${platform}...`);
 
@@ -106,15 +194,6 @@ function buildForPlatform(platform) {
         '  macOS: brew install yt-dlp ffmpeg\n' +
         '  Windows: winget install yt-dlp.yt-dlp / choco install ffmpeg\n');
 
-    // Copy install scripts to parent dir (alongside TuneCrate/ folder) for easy access
-    const parentStage = path.dirname(stageDir);
-    if (platform.startsWith('macos')) {
-        fs.copyFileSync(path.join(ROOT, 'scripts', 'install.sh'), path.join(parentStage, 'install.sh'));
-        fs.chmodSync(path.join(parentStage, 'install.sh'), 0o755);
-    } else if (platform === 'windows-x64') {
-        fs.copyFileSync(path.join(ROOT, 'scripts', 'install.bat'), path.join(parentStage, 'install.bat'));
-    }
-
     // Download platform binaries if available
     const binaries = BINARIES[platform];
     if (binaries && binaries['yt-dlp']) {
@@ -133,28 +212,19 @@ function buildForPlatform(platform) {
         }
     }
 
-    // Create the ZIP
-    const zipName = `TuneCrate-${platform}.zip`;
-    const zipPath = path.join(DIST, zipName);
-    if (fs.existsSync(zipPath)) {
-        fs.unlinkSync(zipPath);
-    }
-
     const parentDir = path.join(DIST, `TuneCrate-${platform}`);
-    console.log(`  Creating ${zipName}...`);
-    if (os.platform() === 'win32') {
-        execSync(`powershell -Command "Compress-Archive -Path '${parentDir}\\*' -DestinationPath '${zipPath}'"`, { stdio: 'inherit' });
-    } else {
-        execSync(`cd "${parentDir}" && zip -r "${zipPath}" .`, { stdio: 'inherit' });
-    }
+    console.log('  Creating native installer...');
+    const installerPath = platform.startsWith('macos')
+        ? buildMacInstaller(platform, stageDir)
+        : buildWindowsInstaller(platform, stageDir);
 
     // Clean up staging directory
     fs.rmSync(parentDir, { recursive: true, force: true });
 
-    const stats = fs.statSync(zipPath);
+    const stats = fs.statSync(installerPath);
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
-    console.log(`  Created: ${zipPath} (${sizeMB} MB)`);
-    return zipPath;
+    console.log(`  Created: ${installerPath} (${sizeMB} MB)`);
+    return installerPath;
 }
 
 // Parse CLI args
